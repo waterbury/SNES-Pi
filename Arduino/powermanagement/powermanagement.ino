@@ -1,7 +1,7 @@
 
 const int PiTX = 2;
 const int MOSFET = 4;
-const int statusLED = 13;
+const int statusLED = 12;
 const int level3v3to5vCtrl = 18;
 const int level5vto3v3Ctrl = 19;
 const int powerSwitch = 3;
@@ -49,7 +49,7 @@ void loop()
    if ( powerSwitchOn() ) //AND power Switch is On
      turnMOSFETon(Invert_MOSFET_Out); //Turn On System Power
    }
-  else if ( (PowerState == 1) && (powerSwitchOn() == false) )//If Power Is On, but Power Switch is off...
+  else if ( (PowerState == 1) && (powerSwitchOn() == 0) )//If Power Is On, but Power Switch is off...
   {
     PowerOffViaSerial();//Send Pi commands to Power Off via serial connection
     delay(5000);//Wait for system to power down
@@ -57,7 +57,7 @@ void loop()
     i = 10;
     while(i>0)
     {      
-      if (isPiOn() == false )//check to see if Pi has safely shut down
+      if (isPiOn() == 0 )//check to see if Pi has safely shut down
       {
        digitalWrite(statusLED,HIGH);
        delay(3000);  
@@ -81,22 +81,24 @@ void loop()
 }
 
 
-boolean powerSwitchOn(){
+int powerSwitchOn(){
  if (digitalRead(powerSwitch) == 0 )
-  return true;
+  return 1;
  else
-  return false;
+  return 0;
  }
 
 
 int PowerOffViaSerial()
-{  
+{  /*
      // $: "exit"
      Serial.write("exit\n");
      //*<sleep 2>
     delay(2000);
     //<ctrl+c>
     Serial.print(0x03, BIN);
+    
+    */
      //*<sleep 2>
     delay(2000);
     //<username>
@@ -147,18 +149,18 @@ void turnMOSFEToff(int invertOut)
 
 
 
-boolean isPiOn()
+int isPiOn()
 {
  int j =0;
  for(j=0;j<10;j++)
  {
   if(digitalRead(PiTX) == HIGH)
-   return(true);
+   return(1);
   else
    delay(50); 
  }
 
- return(false);
+ return(0);
 }
 
 void turnLevelShiftersOff()
