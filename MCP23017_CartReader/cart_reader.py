@@ -5,11 +5,32 @@ def readData():
  return cart.read_byte_data(_SNESBankAndData,GPIOB)
 
 def gotoAddr(addr):
- return cart.write_byte_data(_SNESAddressPins,GPIOA,addr)
+ cart.write_byte_data(_SNESAddressPins,GPIOA,addr)
+
+def gotoBank(bank):
+ cart.write_byte_data(_SNESBankAndData,GPIOA,bank)
 
 def readAddr(addr):
  gotoAddr(addr) 
  return readData()
+
+def readAddrBank(addr,bank):
+ gotoBank(bank) 
+ gotoAddr(addr)
+ return readData()
+
+def gotoOffset(offset,isLowROM):
+ if isLowROM > 0:
+  bank = int( offset / 0xFFFF)
+  addr = offset - (bank * 0xFFFF) 
+  gotoBank(bank)
+  gotoAddr(addr)
+ #else:
+  
+def readOffset(offset,isLowROM):
+ gotoOffset(offset,isLowROM)
+ return readData()
+ 
 
 def getUpNibble(value):
  return int(value/16)
@@ -56,10 +77,7 @@ cart.write_byte_data(_IOControls,GPIOA,0x04)
 
 cartname = ""
 
-
-
 cart.write_byte_data(_SNESAddressPins,GPIOB,0x7F)
-
 
 for x in range(192, 212):
  cartname += chr( readAddr(x) )
@@ -91,9 +109,10 @@ print " - ROM Speed:       " + str(ROMspeed)
 print " - Bank Size:       " + str(bankSize)
 print "ROM Type:           " + str(ROMtype)
 print "ROM Size:           " + str(ROMsize)
+print "SRAM Size:          " + str(SRAMsize)
 print "Country:            " + str(country)
 print "License:            " + str(license)
-print "Version:            " + str(license)
+print "Version:            " + str(version)
 print "Inverse Checksum:   " + str(inverseChecksum)
 print "ROM Checksum:       " + str(ROMchecksum)
 
@@ -101,5 +120,6 @@ print "ROM Checksum:       " + str(ROMchecksum)
 
 #--- Clean Up & End Script ------------------------------------------------------
 gotoAddr(00)
+gotoBank(00)
 cart.write_byte_data(_IOControls,GPIOA,0x10) #Turn off MOSFET
  
