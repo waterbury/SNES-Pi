@@ -5,7 +5,15 @@ def readData():
  return cart.read_byte_data(_SNESBankAndData,GPIOB)
 
 def gotoAddr(addr):
- cart.write_byte_data(_SNESAddressPins,GPIOA,addr)
+ if addr <= 0xffff: 
+  upByte = int(addr/256)
+  lowByte = addr - (upByte * 256)
+  cart.write_byte_data(_SNESAddressPins,GPIOB,upByte)
+  cart.write_byte_data(_SNESAddressPins,GPIOA,lowByte)
+ else:
+  cart.write_byte_data(_SNESAddressPins,GPIOA,0x00)
+  cart.write_byte_data(_SNESAddressPins,GPIOB,0x00)
+
 
 def gotoBank(bank):
  cart.write_byte_data(_SNESBankAndData,GPIOA,bank)
@@ -30,6 +38,23 @@ def gotoOffset(offset,isLowROM):
 def readOffset(offset,isLowROM):
  gotoOffset(offset,isLowROM)
  return readData()
+
+def compareROMchecksums(addr):
+ currentAddr = addr + 28
+
+ inverseChecksum = 0
+ for x in range(currentAddr, currentAddr + 1):
+  inverseChecksum  += readAddr(x)
+
+ currentAddr = addr + 30
+ ROMchecksum = 0
+ for x in range(currentAddr, currentAddr + 1):
+  ROMchecksum  += readAddr(x)
+
+ if inverseChecksum + ROMchecksum == 255:
+  return 1
+ else:
+  return 0
  
 
 def getUpNibble(value):
@@ -78,29 +103,48 @@ cart.write_byte_data(_IOControls,GPIOA,0x04)
 cartname = ""
 
 cart.write_byte_data(_SNESAddressPins,GPIOB,0x7F)
+headerAddr =0
 
-for x in range(192, 212):
+if compareROMchecksums(32704) == 1:
+ print "Checksum matched for lowROM. Assuming this is the case!"
+ print ""
+ headerAddr = 32704
+
+elif compareROMchecksums(65472) == 1:
+ headerAddr = 65472
+ print "Checksum match for hiROM. Assuming this is the case!"
+ print ""
+
+else:
+ print "Checksums did not match. Either no cart, or cart read error"
+
+currentAddr = headerAddr
+
+for x in range(headerAddr, (headerAddr + 20) ):
  cartname += chr( readAddr(x) )
 
-ROMmakeup =  readAddr(213)
+ROMmakeup =  readAddr(headerAddr + 21)
 ROMspeed = getUpNibble(ROMmakeup)
 bankSize = getLowNibble(ROMmakeup)
 
 
-ROMtype   =  readAddr(214)
-ROMsize   =  readAddr(215)
-SRAMsize  =  readAddr(216)
-country   =  readAddr(217)
-license   =  readAddr(218)
-version   =  readAddr(219)
+ROMtype   =  readAddr(headerAddr + 22)
+ROMsize   =  readAddr(headerAddr + 23)
+SRAMsize  =  readAddr(headerAddr + 24)
+country   =  readAddr(headerAddr + 25)
+license   =  readAddr(headerAddr + 26)
+version   =  readAddr(headerAddr + 27)
 
+currentAddr = headerAddr + 28
 
 inverseChecksum = 0
-for x in range(220, 221):
+for x in range(currentAddr, currentAddr + 1):
  inverseChecksum  += readAddr(x)
 
+
+currentAddr = headerAddr + 30
 ROMchecksum = 0
-for x in range(222, 223):
+for x in range(currentAddr, currentAddr + 1):
  ROMchecksum  += readAddr(x)
 
 print "Game Title:         " + cartname
@@ -121,5 +165,18 @@ print "ROM Checksum:       " + str(ROMchecksum)
 #--- Clean Up & End Script ------------------------------------------------------
 gotoAddr(00)
 gotoBank(00)
+
+
+cart.write_byte_data(_SNESAddressPins,IODIRA,0xFF) # Set MCP bank A to outputs (SNES Addr 0-7)
+cart.write_byte_data(_SNESAddressPins,IODIRB,0xFF) # Set MCP bank B to outputs (SNES Addr 8-15)
+
+cart.write_byte_data(_SNESBankAndData,IODIRA,0xFF) # Set MCP bank A to outputs (SNES Bank 0-7)
+cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
+
+
+
+
+cart.write_byte_data(_IOControls,IODIRA,0xEF) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
+
 cart.write_byte_data(_IOControls,GPIOA,0x10) #Turn off MOSFET
  
