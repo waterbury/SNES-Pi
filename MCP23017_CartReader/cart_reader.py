@@ -1,5 +1,6 @@
 import smbus
 import time
+import sys
 
 def readData():
  return cart.read_byte_data(_SNESBankAndData,GPIOB)
@@ -29,11 +30,16 @@ def readAddrBank(addr,bank):
 
 def gotoOffset(offset,isLowROM):
  if isLowROM > 0:
-  bank = int( offset / 0xFFFF)
-  addr = offset - (bank * 0xFFFF) 
+  bank = int( offset / 65536) #64Kilobyte pages
+  addr = offset - (bank * 65536) #64kilobyte pages
   gotoBank(bank)
   gotoAddr(addr)
- #else:
+ else:
+  bank = int( offset / 32768)#32kilobyte pages
+  addr = offset - (bank * 32768)#32kilobyte pages
+  gotoBank(bank)
+  gotoAddr(addr)
+
   
 def readOffset(offset,isLowROM):
  gotoOffset(offset,isLowROM)
@@ -41,17 +47,16 @@ def readOffset(offset,isLowROM):
 
 def compareROMchecksums(addr):
  currentAddr = addr + 28
-
- inverseChecksum = 0
- for x in range(currentAddr, currentAddr + 1):
-  inverseChecksum  += readAddr(x)
+ inverseChecksum  = readAddr(currentAddr)
+ inverseChecksum += readAddr(currentAddr+1) * 256
 
  currentAddr = addr + 30
- ROMchecksum = 0
- for x in range(currentAddr, currentAddr + 1):
-  ROMchecksum  += readAddr(x)
 
- if inverseChecksum + ROMchecksum == 255:
+ ROMchecksum  = readAddr(currentAddr)
+ ROMchecksum += readAddr(currentAddr+1) * 256
+
+
+ if (inverseChecksum | ROMchecksum) == 0xFFFF:
   return 1
  else:
   return 0
@@ -62,6 +67,11 @@ def getUpNibble(value):
 
 def getLowNibble(value):
  return ( value - (getUpNibble(value) * 16) )
+
+
+currentBank = 0
+currentAddr = 0
+currentOffset = 0
 
 
 # ------------ Setup Register Definitions ------------------------------------------
@@ -103,17 +113,19 @@ cart.write_byte_data(_IOControls,GPIOA,0x04)
 cartname = ""
 
 cart.write_byte_data(_SNESAddressPins,GPIOB,0x7F)
-headerAddr =0
+headerAddr =65472
 
 if compareROMchecksums(32704) == 1:
  print "Checksum matched for lowROM. Assuming this is the case!"
  print ""
  headerAddr = 32704
+ isLowROM = 1
 
 elif compareROMchecksums(65472) == 1:
  headerAddr = 65472
  print "Checksum match for hiROM. Assuming this is the case!"
  print ""
+ isLowROM = 0
 
 else:
  print "Checksums did not match. Either no cart, or cart read error"
@@ -136,16 +148,14 @@ license   =  readAddr(headerAddr + 26)
 version   =  readAddr(headerAddr + 27)
 
 currentAddr = headerAddr + 28
-
-inverseChecksum = 0
-for x in range(currentAddr, currentAddr + 1):
- inverseChecksum  += readAddr(x)
-
+inverseChecksum  = readAddr(currentAddr)
+inverseChecksum += readAddr(currentAddr+1) * 256
 
 currentAddr = headerAddr + 30
-ROMchecksum = 0
-for x in range(currentAddr, currentAddr + 1):
- ROMchecksum  += readAddr(x)
+
+ROMchecksum  = readAddr(currentAddr)
+ROMchecksum += readAddr(currentAddr+1) * 256
+
 
 print "Game Title:         " + cartname
 print "ROM Makeup:         " + str(ROMmakeup)
@@ -157,8 +167,13 @@ print "SRAM Size:          " + str(SRAMsize)
 print "Country:            " + str(country)
 print "License:            " + str(license)
 print "Version:            " + str(version)
-print "Inverse Checksum:   " + str(inverseChecksum)
-print "ROM Checksum:       " + str(ROMchecksum)
+print "Inverse Checksum:   " + str(hex(inverseChecksum))
+print "ROM Checksum:       " + str(hex(ROMchecksum))
+print " - Checksums Or'ed: " + str( hex(inverseChecksum | ROMchecksum) )
+
+
+for x in range(0, 0xFFFF):
+ sys.stdout.write( hex( readOffset(x,isLowROM) ) +" " )
 
 
 
