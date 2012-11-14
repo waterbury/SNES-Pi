@@ -9,15 +9,32 @@ def gotoAddr(addr):
  if addr <= 0xffff: 
   upByte = int(addr/256)
   lowByte = addr - (upByte * 256)
-  cart.write_byte_data(_SNESAddressPins,GPIOB,upByte)
-  cart.write_byte_data(_SNESAddressPins,GPIOA,lowByte)
+  
+  if gotoAddr.currentUpByte != upByte:
+   cart.write_byte_data(_SNESAddressPins,GPIOB,upByte)
+   gotoAddr.currentUpByte = upByte
+   #time.sleep(0.05)
+   #print "upByte: " + str( upByte )
+   
+  if gotoAddr.currentLowByte != lowByte: 
+   cart.write_byte_data(_SNESAddressPins,GPIOA,lowByte)
+   gotoAddr.currentLowByte = lowByte
+   #time.sleep(.05)
+   #print "lowByte: " + str( lowByte )
  else:
   cart.write_byte_data(_SNESAddressPins,GPIOA,0x00)
   cart.write_byte_data(_SNESAddressPins,GPIOB,0x00)
 
+gotoAddr.currentAddr = -1
+gotoAddr.currentUpByte = -1
+gotoAddr.currentLowByte = -1
 
 def gotoBank(bank):
- cart.write_byte_data(_SNESBankAndData,GPIOA,bank)
+ if bank != gotoBank.currentBank:
+  cart.write_byte_data(_SNESBankAndData,GPIOA,bank)
+  gotoBank.currentBank = bank
+  
+gotoBank.currentBank = -1
 
 def readAddr(addr):
  gotoAddr(addr) 
@@ -29,31 +46,36 @@ def readAddrBank(addr,bank):
  return readData()
 
 def gotoOffset(offset,isLowROM):
+
  if isLowROM > 0:
   bank = int( offset / 65536) #64Kilobyte pages
   addr = offset - (bank * 65536) #64kilobyte pages
-  gotoBank(bank)
-  gotoAddr(addr)
+
  else:
   bank = int( offset / 32768)#32kilobyte pages
   addr = offset - (bank * 32768)#32kilobyte pages
-  gotoBank(bank)
-  gotoAddr(addr)
+
+ gotoBank(bank)
+ gotoAddr(addr)
+  
+ gotoOffset.currentOffset = offset
+ 
+gotoOffset.currentOffset = 0
 
   
 def readOffset(offset,isLowROM):
  gotoOffset(offset,isLowROM)
  return readData()
 
-def compareROMchecksums(addr):
- currentAddr = addr + 28
- inverseChecksum  = readAddr(currentAddr)
- inverseChecksum += readAddr(currentAddr+1) * 256
+def compareROMchecksums(header,isLowROM):
+ currentOffset = header + 28
+ inverseChecksum  = readOffset(currentOffset,isLowROM)
+ inverseChecksum += readOffset(currentOffset+1,isLowROM) * 256
 
- currentAddr = addr + 30
+ currentOffset = header + 30
 
- ROMchecksum  = readAddr(currentAddr)
- ROMchecksum += readAddr(currentAddr+1) * 256
+ ROMchecksum  = readOffset(currentOffset,isLowROM)
+ ROMchecksum += readOffset(currentOffset+1,isLowROM) * 256
 
 
  if (inverseChecksum | ROMchecksum) == 0xFFFF:
@@ -107,21 +129,22 @@ cart.write_byte_data(_IOControls,IODIRA,0x80) # Set MCP bank A to outputs; WITH 
 cart.write_byte_data(_IOControls,IODIRB,0x00) # Set MCP bank B to outputs 
 
 #----------------------------------------------------------------------------------------------------
+cart.write_byte_data(_IOControls,GPIOA,0x06)#reset
+time.sleep(.25)
 cart.write_byte_data(_IOControls,GPIOA,0x04)
 #-----------------------------------------------------
 
 cartname = ""
 
-cart.write_byte_data(_SNESAddressPins,GPIOB,0x7F)
-headerAddr =65472
+headerAddr =32704
 
-if compareROMchecksums(32704) == 1:
+if compareROMchecksums(32704,0) == 1:
  print "Checksum matched for lowROM. Assuming this is the case!"
  print ""
  headerAddr = 32704
  isLowROM = 1
 
-elif compareROMchecksums(65472) == 1:
+elif compareROMchecksums(65472,1) == 1:
  headerAddr = 65472
  print "Checksum match for hiROM. Assuming this is the case!"
  print ""
@@ -131,6 +154,7 @@ else:
  print "Checksums did not match. Either no cart, or cart read error"
 
 currentAddr = headerAddr
+gotoOffset(headerAddr, isLowROM)
 
 for x in range(headerAddr, (headerAddr + 20) ):
  cartname += chr( readAddr(x) )
@@ -172,9 +196,18 @@ print "ROM Checksum:       " + str(hex(ROMchecksum))
 print " - Checksums Or'ed: " + str( hex(inverseChecksum | ROMchecksum) )
 
 
-for x in range(0, 0xFFFF):
- sys.stdout.write( hex( readOffset(x,isLowROM) ) +" " )
+#dump = ""
+#timeStart = time.time()
+#for x in range(0, 0x100000):
+# sys.stdout.write( hex( readOffset(x,isLowROM) ) +" " )
+  #dump += chr(readOffset(x,isLowROM))
+#timeEnd = time.time()
+#print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
 
+
+#f = open('rawfiledump','w')
+#f.write(dump)
+#f.close
 
 
 #--- Clean Up & End Script ------------------------------------------------------
@@ -191,7 +224,8 @@ cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to inputs  (
 
 
 
-cart.write_byte_data(_IOControls,IODIRA,0xEF) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
+cart.write_byte_data(_IOControls,IODIRA,0xEF) # Set MCP bank A to inputs; WITH EXCEPTION TO MOSFET
 
 cart.write_byte_data(_IOControls,GPIOA,0x10) #Turn off MOSFET
+#cart.write_byte_data(_IOControls,IODIRA,0xFF) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
  
