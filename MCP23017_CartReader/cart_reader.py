@@ -47,7 +47,7 @@ def readAddrBank(addr,bank):
 
 def gotoOffset(offset,isLowROM):
 
- if isLowROM > 0:
+ if isLowROM == 0:
   bank = int( offset / 65536) #64Kilobyte pages
   addr = offset - (bank * 65536) #64kilobyte pages
 
@@ -95,6 +95,23 @@ currentBank = 0
 currentAddr = 0
 currentOffset = 0
 
+def getROMsize(offset, isLowROM):
+ ROMsizeRegister = readOffset(offset,isLowROM)
+ ROMsizeRegister -= 7
+
+ if ROMsizeRegister >=0:
+  return  pow(2, ROMsizeRegister)
+ else:
+  return -1
+
+def getNumberOfPages(actualROMsize,isLowROM):
+ actualROMsize *= 2
+ if isLowROM == 1:
+  actualROMsize *= 2
+
+ return actualROMsize
+
+
 
 # ------------ Setup Register Definitions ------------------------------------------
 databyte = ""
@@ -131,24 +148,28 @@ cart.write_byte_data(_IOControls,IODIRB,0x00) # Set MCP bank B to outputs
 #----------------------------------------------------------------------------------------------------
 cart.write_byte_data(_IOControls,GPIOA,0x06)#reset
 time.sleep(.25)
-cart.write_byte_data(_IOControls,GPIOA,0x04)
+#cart.write_byte_data(_IOControls,GPIOA,0x04)
 #-----------------------------------------------------
 
 cartname = ""
 
-headerAddr =32704
+headerAddr =65472
+isLowROM = 0
+isValid = 0
 
 if compareROMchecksums(32704,0) == 1:
  print "Checksum matched for lowROM. Assuming this is the case!"
  print ""
  headerAddr = 32704
  isLowROM = 1
+ isValid = 1
 
 elif compareROMchecksums(65472,1) == 1:
  headerAddr = 65472
  print "Checksum match for hiROM. Assuming this is the case!"
  print ""
  isLowROM = 0
+ isValid = 0
 
 else:
  print "Checksums did not match. Either no cart, or cart read error"
@@ -165,7 +186,7 @@ bankSize = getLowNibble(ROMmakeup)
 
 
 ROMtype   =  readAddr(headerAddr + 22)
-ROMsize   =  readAddr(headerAddr + 23)
+ROMsize   =  getROMsize(headerAddr + 23, isLowROM)
 SRAMsize  =  readAddr(headerAddr + 24)
 country   =  readAddr(headerAddr + 25)
 license   =  readAddr(headerAddr + 26)
@@ -180,13 +201,15 @@ currentAddr = headerAddr + 30
 ROMchecksum  = readAddr(currentAddr)
 ROMchecksum += readAddr(currentAddr+1) * 256
 
+numberOfPages = getNumberOfPages(ROMsize,isLowROM)
+
 
 print "Game Title:         " + cartname
 print "ROM Makeup:         " + str(ROMmakeup)
 print " - ROM Speed:       " + str(ROMspeed)
 print " - Bank Size:       " + str(bankSize)
 print "ROM Type:           " + str(ROMtype)
-print "ROM Size:           " + str(ROMsize)
+print "ROM Size:           " + str(ROMsize) + " Mbits"
 print "SRAM Size:          " + str(SRAMsize)
 print "Country:            " + str(country)
 print "License:            " + str(license)
@@ -194,20 +217,51 @@ print "Version:            " + str(version)
 print "Inverse Checksum:   " + str(hex(inverseChecksum))
 print "ROM Checksum:       " + str(hex(ROMchecksum))
 print " - Checksums Or'ed: " + str( hex(inverseChecksum | ROMchecksum) )
+print ""
+print "Number of pages:    " + str( numberOfPages )
 
-
-#dump = ""
-#timeStart = time.time()
+dump = ""
 #for x in range(0, 0x100000):
 # sys.stdout.write( hex( readOffset(x,isLowROM) ) +" " )
   #dump += chr(readOffset(x,isLowROM))
 #timeEnd = time.time()
 #print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
 
+y = 0
+pageChecksum = 0
+totalChecksum = 0
+currentByte = 0
 
-#f = open('rawfiledump','w')
-#f.write(dump)
-#f.close
+
+isValid = 0
+if isValid == 1:
+ for x in range(0, 16):
+  timeStart = time.time()
+  print "----Start Cart Read------"
+  print "Current Bank:       " + str( gotoBank.currentBank )
+  while x == gotoBank.currentBank:
+   currentByte = readOffset(y,isLowROM)
+   dump += chr(currentByte)
+   pageChecksum += currentByte
+   print hex( currentByte )
+   y += 1
+ 
+  if isLowROM == 0 or (isLowROM == 1 and gotoBank.currentBank % 2 == 0):
+   print " - Page Checksum:       " + str( pageChecksum ) 
+   totalChecksum += pageChecksum
+   pageChecksum = 0
+
+ timeEnd = time.time()
+ print ""
+ print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
+
+ f = open(cartname + '.smc','w')
+ f.write(dump)
+ f.close
+
+ print ""
+ print "Checksum:             " + str( totalChecksum ) + " | Hex: " + str( hex( totalChecksum ) )
+ print "Header Checksum:      " + str(hex(ROMchecksum))
 
 
 #--- Clean Up & End Script ------------------------------------------------------
