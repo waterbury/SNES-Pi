@@ -159,7 +159,7 @@ cart.write_byte_data(_IOControls,IODIRB,0x00) # Set MCP bank B to outputs
 #----------------------------------------------------------------------------------------------------
 cart.write_byte_data(_IOControls,GPIOA,0x06)#reset
 time.sleep(.25)
-#cart.write_byte_data(_IOControls,GPIOA,0x04)
+cart.write_byte_data(_IOControls,GPIOA,0x04)
 #-----------------------------------------------------
 
 cartname = ""
@@ -170,16 +170,17 @@ isValid = 0
 
 if compareROMchecksums(32704,1) == 1:
  print "Checksums matched"
- ROMmakeup =  readAddr(headerAddr + 21,isLowROM)
+ ROMmakeup =  readOffset(headerAddr + 21,isLowROM)
  ROMspeed = getUpNibble(ROMmakeup)
  bankSize = getLowNibble(ROMmakeup)
 
  if bankSize == 0:
-   print "Checksum match for LoROM. Assuming this is the case!"
+   print "ROM Makeup match for LoROM. Assuming this is the case!"
    isLowROM = 1
    isValid = 1
  elif bankSize == 1:
-   print "Checksum match for HiROM. Assuming this is the case!"
+   print "ROM Makeup match for HiROM. Assuming this is the case!"
+   headerAddr = 65472
    isLowROM = 0
    isValid = 1
  else:
@@ -191,7 +192,7 @@ currentAddr = headerAddr
 gotoOffset(headerAddr, isLowROM)
 
 for x in range(headerAddr, (headerAddr + 20) ):
- cartname += chr( readAddr(x,isLowROM) )
+ cartname += chr( readOffset(x,isLowROM) )
 
 ROMmakeup =  readAddr(headerAddr + 21,isLowROM)
 ROMspeed = getUpNibble(ROMmakeup)
