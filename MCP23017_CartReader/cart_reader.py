@@ -20,13 +20,13 @@ def gotoAddr(addr,isLowROM):
    cart.write_byte_data(_SNESAddressPins,GPIOB,upByte)
    gotoAddr.currentUpByte = upByte
    #time.sleep(0.05)
-   #print "upByte: " + str( upByte )
+   #print "current upByte: " + str( upByte )
    
   if gotoAddr.currentLowByte != lowByte: 
    cart.write_byte_data(_SNESAddressPins,GPIOA,lowByte)
    gotoAddr.currentLowByte = lowByte
    #time.sleep(.05)
-   #print "lowByte: " + str( lowByte )
+   #print "current lowByte: " + str( lowByte )
  else:
   cart.write_byte_data(_SNESAddressPins,GPIOA,0x00)
   cart.write_byte_data(_SNESAddressPins,GPIOB,0x00)
@@ -251,15 +251,17 @@ currentByte = 0
 if isValid == 1:
  #cart.write_byte_data(_IOControls,GPIOA,0x04)
  timeStart = time.time()
+ gotoOffset(y,isLowROM)
  for x in range(0, numberOfPages):
   print "----Start Cart Read------"
   print "Current Bank:       " + str( gotoBank.currentBank )
   while x == gotoBank.currentBank:
-   currentByte = readOffset(y,isLowROM)
+   currentByte = readData()
    dump += chr(currentByte)
    pageChecksum += currentByte
    #sys.stdout.write( str( currentByte ) + " ")
    y += 1
+   gotoOffset(y,isLowROM)
  
   if isLowROM == 0 or (isLowROM == 1 and gotoBank.currentBank % 2 == 0):
    print " - Page Checksum:       " + str( pageChecksum ) 
