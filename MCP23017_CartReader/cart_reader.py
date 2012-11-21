@@ -122,7 +122,11 @@ def getNumberOfPages(actualROMsize,isLowROM):
 
  return actualROMsize
 
-
+def returnNULLheader():
+ charStr = ""
+ for x in range(0, 512):
+  charStr += chr(0x00)
+ return charStr
 
 # ------------ Setup Register Definitions ------------------------------------------
 databyte = ""
@@ -138,13 +142,14 @@ GPIOB  = 0X13
 
 # ------------- Set Registers -----------------------------------------------------
 
-cart = smbus.SMBus(0)
+cart = smbus.SMBus(1)
 
 cart.write_byte_data(_SNESAddressPins,IODIRA,0x00) # Set MCP bank A to outputs (SNES Addr 0-7)
 cart.write_byte_data(_SNESAddressPins,IODIRB,0x00) # Set MCP bank B to outputs (SNES Addr 8-15)
 
 cart.write_byte_data(_SNESBankAndData,IODIRA,0x00) # Set MCP bank A to outputs (SNES Bank 0-7)
 cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
+
 
 cart.write_byte_data(_IOControls,IODIRA,0x80) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
 # GPA0: /RD
@@ -159,7 +164,8 @@ cart.write_byte_data(_IOControls,IODIRB,0x00) # Set MCP bank B to outputs
 #----------------------------------------------------------------------------------------------------
 cart.write_byte_data(_IOControls,GPIOA,0x06)#reset
 time.sleep(.25)
-cart.write_byte_data(_IOControls,GPIOA,0x04)
+#cart.write_byte_data(_IOControls,GPIOA,0x04)
+
 #-----------------------------------------------------
 
 cartname = ""
@@ -188,6 +194,11 @@ if compareROMchecksums(32704,1) == 1:
 else:
  print "Checksums did not match. Either no cart, or cart read error"
 
+#--- Debug. Manually set bank size ----------
+#isLowROM = 1
+#-------------------------------------------
+
+
 currentAddr = headerAddr
 gotoOffset(headerAddr, isLowROM)
 
@@ -211,12 +222,21 @@ inverseChecksum  = readAddr(currentAddr,isLowROM)
 inverseChecksum += readAddr(currentAddr+1,isLowROM) * 256
 
 currentAddr = headerAddr + 30
-
 ROMchecksum  = readAddr(currentAddr,isLowROM)
 ROMchecksum += readAddr(currentAddr+1,isLowROM) * 256
 
-numberOfPages = getNumberOfPages(ROMsize,isLowROM)
+currentAddr = headerAddr + 32
+VBLvector = readAddr(currentAddr,isLowROM)
+VBLvector += readAddr(currentAddr+1,isLowROM) * 256
 
+currentAddr = headerAddr + 34
+resetVector = readAddr(currentAddr,isLowROM)
+resetVector += readAddr(currentAddr+1,isLowROM) * 256
+
+
+
+numberOfPages = getNumberOfPages(ROMsize,isLowROM)
+#numberOfPages = 16
 
 print "Game Title:         " + cartname
 print "ROM Makeup:         " + str(ROMmakeup)
@@ -230,36 +250,38 @@ print "License:            " + str(license)
 print "Version:            " + str(version)
 print "Inverse Checksum:   " + str(hex(inverseChecksum))
 print "ROM Checksum:       " + str(hex(ROMchecksum))
-print " - Checksums xOr'ed: " + str( hex(inverseChecksum | ROMchecksum) )
+print " - Checksums xOr'ed:   " + str( hex(inverseChecksum | ROMchecksum) )
+print ""
+print "VBL Vector:         " + str(VBLvector)
+print "Reset Vector:       " + str(resetVector)
 print ""
 print "Number of pages:    " + str( numberOfPages )
 
 dump = ""
-#for x in range(0, 0x100000):
-# sys.stdout.write( hex( readOffset(x,isLowROM) ) +" " )
-  #dump += chr(readOffset(x,isLowROM))
-#timeEnd = time.time()
-#print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
-
+dump = returnNULLheader()
 y = 0
 pageChecksum = 0
 totalChecksum = 0
 currentByte = 0
 
-
 #isValid = 0
 if isValid == 1:
  #cart.write_byte_data(_IOControls,GPIOA,0x04)
  timeStart = time.time()
+ #y=0
+ y = 0x400000
  gotoOffset(y,isLowROM)
- for x in range(0, numberOfPages):
+
+ startBank = gotoBank.currentBank
+ for x in range(startBank, (numberOfPages + startBank)  ):
   print "----Start Cart Read------"
   print "Current Bank:       " + str( gotoBank.currentBank )
   while x == gotoBank.currentBank:
    currentByte = readData()
    dump += chr(currentByte)
    pageChecksum += currentByte
-   #sys.stdout.write( str( currentByte ) + " ")
+   #----- Debug
+   #print  "Offset :" + str(hex(gotoOffset.currentOffset))  +"| Bank: " + str(hex(gotoBank.currentBank)) + "| Upper Byte: " + str(hex(gotoAddr.currentUpByte)) + " | Lower Byte: " + str(hex(gotoAddr.currentLowByte)) 
    y += 1
    gotoOffset(y,isLowROM)
  
@@ -281,8 +303,19 @@ if isValid == 1:
  f.close
 
  print ""
- print "Checksum:             " + str( totalChecksum ) + " | Hex: " + str( hex( totalChecksum ) )
- print "Header Checksum:      " + str(hex(ROMchecksum))
+ print "Entire Checksum:             " + str( hex( totalChecksum ) )
+ print ""
+ print "Header Checksum:             " + str( hex( ROMchecksum ) )
+
+ totalChecksum = ( totalChecksum & 0xFFFF )
+
+ print "16-bit Generated Checksum:   " + str( hex( totalChecksum ) )
+
+ if totalChecksum == ROMchecksum:
+  print "--------------------------   CHECKSUMS MATCH!"
+ else:
+  print "----------WARNING: CHECKSUMS DO NOT MATCH: " +str( hex( totalChecksum ) ) + " != " +  str( hex( ROMchecksum ) )
+
 
 
 #--- Clean Up & End Script ------------------------------------------------------
