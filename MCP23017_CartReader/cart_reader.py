@@ -127,6 +127,48 @@ def returnNULLheader():
  for x in range(0, 512):
   charStr += chr(0x00)
  return charStr
+ 
+def ripROM (startBank, isLowROM,numberOfPages):
+  #cart.write_byte_data(_IOControls,GPIOA,0x04)
+ ROMdump = ""
+ pageChecksum = 0
+ currentByte = 0
+ bank = 0
+ 
+ if isLowROM == 1:
+  startOffset = startBank * 0x8000
+ else:
+  startOffset = startBank * 0x10000
+ 
+ offset = startOffset  # Set current Offset to starting offset
+ gotoOffset(startOffset,isLowROM)# Change current bank & address to offset
+ 
+  #Start at current bank, and increment the number of banks needed
+ for bank in range(startBank, (numberOfPages + startBank)  ): 
+  print "----Start Cart Read------"
+  print "Current Bank:       " + str( gotoBank.currentBank )
+  
+  #If bank increments, exit the following inner loop, else keep scanning
+  while bank == gotoBank.currentBank:
+   currentByte = readData()
+   ROMdump += chr(currentByte)
+   pageChecksum += currentByte 
+   #----- Debug
+   #print  "Offset :" + str(hex(gotoOffset.currentOffset))  +"| Bank: " + str(hex(gotoBank.currentBank)) + "| Upper Byte: " + str(hex(gotoAddr.currentUpByte)) + " | Lower Byte: " + str(hex(gotoAddr.currentLowByte)) 
+   offset += 1 #Increment offset
+   gotoOffset(offset,isLowROM) #goto new offset
+ 
+  if isLowROM == 0 or (isLowROM == 1 and gotoBank.currentBank % 2 == 0):
+   print " - Page Checksum:       " + str( pageChecksum ) 
+   ripROM.totalChecksum += pageChecksum
+   pageChecksum = 0
+   print ""
+   print "Current Checksum:      " + str( ripROM.totalChecksum ) + " | Hex: " + str( hex( ripROM.totalChecksum ) )
+   print "Header Checksum:       " + str(hex(ROMchecksum))
+  
+ return ROMdump
+ 
+ripROM.totalChecksum = 0
 
 # ------------ Setup Register Definitions ------------------------------------------
 databyte = ""
@@ -256,6 +298,7 @@ print "VBL Vector:         " + str(VBLvector)
 print "Reset Vector:       " + str(resetVector)
 print ""
 print "Number of pages:    " + str( numberOfPages )
+print ""
 
 dump = ""
 dump = returnNULLheader()
@@ -263,37 +306,66 @@ y = 0
 pageChecksum = 0
 totalChecksum = 0
 currentByte = 0
+numberOfRemainPages = 0
+firstNumberOfPages = 0
 
-#isValid = 0
+
 if isValid == 1:
- #cart.write_byte_data(_IOControls,GPIOA,0x04)
  timeStart = time.time()
- #y=0
- y = 0x400000
- gotoOffset(y,isLowROM)
-
- startBank = gotoBank.currentBank
- for x in range(startBank, (numberOfPages + startBank)  ):
-  print "----Start Cart Read------"
-  print "Current Bank:       " + str( gotoBank.currentBank )
-  while x == gotoBank.currentBank:
-   currentByte = readData()
-   dump += chr(currentByte)
-   pageChecksum += currentByte
-   #----- Debug
-   #print  "Offset :" + str(hex(gotoOffset.currentOffset))  +"| Bank: " + str(hex(gotoBank.currentBank)) + "| Upper Byte: " + str(hex(gotoAddr.currentUpByte)) + " | Lower Byte: " + str(hex(gotoAddr.currentLowByte)) 
-   y += 1
-   gotoOffset(y,isLowROM)
+ numberOfRemainPages = 0
+ firstNumberOfPages = numberOfPages
  
-  if isLowROM == 0 or (isLowROM == 1 and gotoBank.currentBank % 2 == 0):
-   print " - Page Checksum:       " + str( pageChecksum ) 
-   totalChecksum += pageChecksum
-   pageChecksum = 0
-   print ""
-   print "Current Checksum:      " + str( totalChecksum ) + " | Hex: " + str( hex( totalChecksum ) )
-   print "Header Checksum:       " + str(hex(ROMchecksum))
+ if isLowROM == 1:  
+  #if numberOfPages > 48:
+   #numberOfRemainPages = ( numberOfPages - 48 ) # number of pages over 48
+   #print "Reading first 48 of " + str(numberOfPages) + " Low ROM pages."
+   #firstNumberOfPages = 48
+  #else:
+  print "Reading " + str(numberOfPages) + " Low ROM pages."
 
+  dump = ripROM(0x00, isLowROM, firstNumberOfPages)
 
+  #if numberOfRemainPages > 16:
+   #print "Reading next 16 of " +str(numberOfRemainPages) +" Low ROM pages."
+   #dump += ripROM(0x30, isLowROM, 16)
+
+   #numberOfRemainPage -= 16
+   #print "Reading last " + str(numberOfRemainPages) + " of Low ROM pages."
+   #dump += ripROM(0x40, isLowROM, numberOfRemainPages)
+
+  #elif numberOfRemainPages > 0:
+   #print "Reading last " + str(numberOfRemainPages) + " of Low ROM pages."
+   #dump += ripROM(0x30, isLowROM, numberOfRemainPages)
+ 
+ else:
+  if numberOfPages > 64:
+   numberOfRemainPages = ( numberOfPages - 64 ) # number of pages over 64
+   print "Reading first 64 of " + str(numberOfPages) + " Hi ROM pages."
+   firstNumberOfPages = 64
+  else:
+   print "Reading " + str(numberOfPages) + " Hi ROM pages."
+
+  dump = ripROM(0xC0, isLowROM, firstNumberOfPages) 
+
+  if numberOfRemainPages > 0:
+   print "Reading last " + str(numberOfRemainPages) + " of High ROM pages."
+   dump += ripROM(0x40, isLowROM, numberOfRemainPages)
+
+ print ""
+ print "Entire Checksum:             " + str( hex( ripROM.totalChecksum ) )
+ print ""
+ print "Header Checksum:             " + str( hex( ROMchecksum ) )
+
+ ripROM.totalChecksum = ( ripROM.totalChecksum & 0xFFFF )
+
+ print "16-bit Generated Checksum:   " + str( hex( ripROM.totalChecksum ) )
+
+ if ripROM.totalChecksum == ROMchecksum:
+  print "--------------------------   CHECKSUMS MATCH!"
+ else:
+  print "----------WARNING: CHECKSUMS DO NOT MATCH: " +str( hex( ripROM.totalChecksum ) ) + " != " +  str( hex( ROMchecksum ) )
+   
+   
  timeEnd = time.time()
  print ""
  print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
@@ -301,20 +373,6 @@ if isValid == 1:
  f = open(cartname + '.smc','w')
  f.write(dump)
  f.close
-
- print ""
- print "Entire Checksum:             " + str( hex( totalChecksum ) )
- print ""
- print "Header Checksum:             " + str( hex( ROMchecksum ) )
-
- totalChecksum = ( totalChecksum & 0xFFFF )
-
- print "16-bit Generated Checksum:   " + str( hex( totalChecksum ) )
-
- if totalChecksum == ROMchecksum:
-  print "--------------------------   CHECKSUMS MATCH!"
- else:
-  print "----------WARNING: CHECKSUMS DO NOT MATCH: " +str( hex( totalChecksum ) ) + " != " +  str( hex( ROMchecksum ) )
 
 
 
@@ -327,7 +385,7 @@ cart.write_byte_data(_SNESAddressPins,IODIRA,0xFF) # Set MCP bank A to outputs (
 cart.write_byte_data(_SNESAddressPins,IODIRB,0xFF) # Set MCP bank B to outputs (SNES Addr 8-15)
 
 cart.write_byte_data(_SNESBankAndData,IODIRA,0xFF) # Set MCP bank A to outputs (SNES Bank 0-7)
-cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
+cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to inputs (SNES Data 0-7)
 
 
 
