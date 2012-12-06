@@ -1,6 +1,7 @@
 import smbus
 import time
 import sys
+import os
 
 def readData():
  return cart.read_byte_data(_SNESBankAndData,GPIOB)
@@ -142,11 +143,12 @@ def ripROM (startBank, isLowROM,numberOfPages):
  
  offset = startOffset  # Set current Offset to starting offset
  gotoOffset(startOffset,isLowROM)# Change current bank & address to offset
- 
-  #Start at current bank, and increment the number of banks needed
+
+ print "----Start Cart Read------" 
+ print ""
+ #Start at current bank, and increment the number of banks needed
  for bank in range(startBank, (numberOfPages + startBank)  ): 
-  print "----Start Cart Read------"
-  print "Current Bank:       " + str( gotoBank.currentBank )
+  print "Current Bank:  DEC: " + str( gotoBank.currentBank ) + "; HEX: " + str( hex(gotoBank.currentBank ))
   
   #If bank increments, exit the following inner loop, else keep scanning
   while bank == gotoBank.currentBank:
@@ -165,6 +167,7 @@ def ripROM (startBank, isLowROM,numberOfPages):
    print ""
    print "Current Checksum:      " + str( ripROM.totalChecksum ) + " | Hex: " + str( hex( ripROM.totalChecksum ) )
    print "Header Checksum:       " + str(hex(ROMchecksum))
+   print ""
   
  return ROMdump
  
@@ -310,6 +313,21 @@ numberOfRemainPages = 0
 firstNumberOfPages = 0
 
 
+g = open("insertedCart",'w')
+
+if isValid == 1:
+ g.write(cartname + '.smc')
+else:
+ g.write("NULL")
+ 
+g.close
+
+
+
+if os.path.exists(cartname + '.smc') and isValid == 1:
+ print "Cart has already been ripped, not ripping again!"
+ isValid = 0
+ 
 if isValid == 1:
  timeStart = time.time()
  numberOfRemainPages = 0
