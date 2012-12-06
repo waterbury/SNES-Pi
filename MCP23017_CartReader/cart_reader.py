@@ -329,22 +329,24 @@ numberOfRemainPages = 0
 firstNumberOfPages = 0
 
 
-g = open("insertedCart",'w')
-
-if isValid == 1:
- g.write(cartname)
-else:
- g.write("NULL")
- 
-g.close
 
 if directory != "" :
  if directory[len(directory)-1] != "/":
   directory += "/"
 
-if os.path.exists(directory + cartname + '.smc') and isValid == 1:
- print "Cart has already been ripped, not ripping again!"
- isValid = 0
+g = open("insertedCart",'w')
+
+if isValid == 1:
+ g.write(cartname)
+ if os.path.exists(directory + cartname + '.smc'):
+  print "Cart has already been ripped, not ripping again!"
+  isValid = 0
+
+else:
+ g.write("NULL")
+ 
+g.close
+
  
 if isValid == 1:
  timeStart = time.time()
