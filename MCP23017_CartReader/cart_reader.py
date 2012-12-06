@@ -334,7 +334,7 @@ if directory != "" :
  if directory[len(directory)-1] != "/":
   directory += "/"
 
-g = open("insertedCart",'w')
+g = open("/tmp/insertedCart",'w')
 
 if isValid == 1:
  g.write(cartname)

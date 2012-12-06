@@ -8,8 +8,8 @@ LIBRETROPATH="/home/pi/RetroPie/emulatorcores/pocketsnes-libretro/libretro.so"
 EMULATIONCMD="sudo -u pi retroarch "
 
 
-if [ -f insertedCart ]; then 
-   CARTNAME=$(<insertedCart)
+if [ -f /tmp/insertedCart ]; then 
+   CARTNAME=$(</tmp/insertedCart)
    if [ "$CARTNAME" != "NULL" ]; then
       SMCEXT=".smc"
       FILENAME=$CARTNAME$SMCEXT
