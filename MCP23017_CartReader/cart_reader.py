@@ -2,6 +2,7 @@ import smbus
 import time
 import sys
 import os
+import getopt
 
 def readData():
  return cart.read_byte_data(_SNESBankAndData,GPIOB)
@@ -173,6 +174,21 @@ def ripROM (startBank, isLowROM,numberOfPages):
  
 ripROM.totalChecksum = 0
 
+
+
+directory = ""
+try:
+ opts, args = getopt.getopt(sys.argv[1:],"d:",["directory="])
+except getopt.GetoptError:
+ print "Usage: cart_reader.py -d <optional directory>"
+ sys.exit(2)
+for opt, arg in opts:
+ if opt in ("-d","--directory"):
+  directory = arg
+
+#if __name__ == "__main__":
+#  main(sys.argv[1:])
+
 # ------------ Setup Register Definitions ------------------------------------------
 databyte = ""
 
@@ -316,15 +332,17 @@ firstNumberOfPages = 0
 g = open("insertedCart",'w')
 
 if isValid == 1:
- g.write(cartname + '.smc')
+ g.write(cartname)
 else:
  g.write("NULL")
  
 g.close
 
+if directory != "" :
+ if directory[len(directory)-1] != "/":
+  directory += "/"
 
-
-if os.path.exists(cartname + '.smc') and isValid == 1:
+if os.path.exists(directory + cartname + '.smc') and isValid == 1:
  print "Cart has already been ripped, not ripping again!"
  isValid = 0
  
@@ -332,28 +350,13 @@ if isValid == 1:
  timeStart = time.time()
  numberOfRemainPages = 0
  firstNumberOfPages = numberOfPages
+ f = open(directory + cartname + '.smc','w')
+
  
- if isLowROM == 1:  
-  #if numberOfPages > 48:
-   #numberOfRemainPages = ( numberOfPages - 48 ) # number of pages over 48
-   #print "Reading first 48 of " + str(numberOfPages) + " Low ROM pages."
-   #firstNumberOfPages = 48
-  #else:
+ if isLowROM == 1:    
   print "Reading " + str(numberOfPages) + " Low ROM pages."
 
   dump = ripROM(0x00, isLowROM, firstNumberOfPages)
-
-  #if numberOfRemainPages > 16:
-   #print "Reading next 16 of " +str(numberOfRemainPages) +" Low ROM pages."
-   #dump += ripROM(0x30, isLowROM, 16)
-
-   #numberOfRemainPage -= 16
-   #print "Reading last " + str(numberOfRemainPages) + " of Low ROM pages."
-   #dump += ripROM(0x40, isLowROM, numberOfRemainPages)
-
-  #elif numberOfRemainPages > 0:
-   #print "Reading last " + str(numberOfRemainPages) + " of Low ROM pages."
-   #dump += ripROM(0x30, isLowROM, numberOfRemainPages)
  
  else:
   if numberOfPages > 64:
@@ -388,7 +391,6 @@ if isValid == 1:
  print ""
  print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
 
- f = open(cartname + '.smc','w')
  f.write(dump)
  f.close
 
