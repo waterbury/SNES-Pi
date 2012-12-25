@@ -200,7 +200,11 @@ IODIRA = 0X00
 IODIRB = 0X01
 GPIOA  = 0X12
 GPIOB  = 0X13
-
+GPINTENB = 0x05
+DEFVALB = 0x07
+INTCONB = 0x09
+IOCON_B = 0x0B
+GPPUB   = 0x0D
 # ------------- Set Registers -----------------------------------------------------
 
 cart = smbus.SMBus(1)
@@ -210,6 +214,16 @@ cart.write_byte_data(_SNESAddressPins,IODIRB,0x00) # Set MCP bank B to outputs (
 
 cart.write_byte_data(_SNESBankAndData,IODIRA,0x00) # Set MCP bank A to outputs (SNES Bank 0-7)
 cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
+
+cart.write_byte_data(_SNESBankAndData,GPPUB,0xFF) # Enables Pull-Up Resistors on MCP SNES Data 0-7
+cart.write_byte_data(_SNESBankAndData,DEFVALB,0xFF) # Expect MCP SNES Data 0-7 to default to 0xFF
+#cart.write_byte_data(_SNESBankAndData,GPINTENB,0xFF) # Sets up all of SNES Data 0-7 to be interrupt enabled
+cart.write_byte_data(_SNESBankAndData,GPINTENB,0x89) # Sets up some of SNES Data 0-7 to be interrupt enabled
+
+#cart.write_byte_data(_SNESBankAndData,INTCONB,0x00) # compares interrupts to previous SNES Data 0-7
+cart.write_byte_data(_SNESBankAndData,INTCONB,0xFF) # compares interrupts to DEFVALB
+                       
+
 
 
 cart.write_byte_data(_IOControls,IODIRA,0x80) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
@@ -402,6 +416,9 @@ if isValid == 1:
 gotoAddr(00,0)
 gotoBank(00)
 
+cart.write_byte_data(_SNESBankAndData,GPPUB,0x00) # Disables Pull-Up Resistors on MCP SNES Data 0-7
+cart.write_byte_data(_SNESBankAndData,DEFVALB,0xFF) # Expect MCP SNES Data 0-7 to default to 0xFF
+cart.write_byte_data(_SNESBankAndData,GPINTENB,0x00) # Sets up all of SNES Data 0-7 to be interrupt disabled
 
 cart.write_byte_data(_SNESAddressPins,IODIRA,0xFF) # Set MCP bank A to outputs (SNES Addr 0-7)
 cart.write_byte_data(_SNESAddressPins,IODIRB,0xFF) # Set MCP bank B to outputs (SNES Addr 8-15)

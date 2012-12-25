@@ -1,6 +1,6 @@
 #!/bin/bash    
-ROMPATH=~/RetroPie/roms/snes
-USERHOME=~/
+ROMPATH=/home/pi/RetroPie/roms/snes/
+USERHOME=/home/pi/
 
 
 python "$USERHOME"SNES-Pi/MCP23017_CartReader/cart_reader.py -d "$ROMPATH"
@@ -14,10 +14,16 @@ if [ -f /tmp/insertedCart ]; then
       SMCEXT=".smc"
       FILENAME=$CARTNAME$SMCEXT
       FULLPATH=$ROMPATH/${FILENAME// /\ }
-      $EMULATIONCMD "$FULLPATH"  -L $LIBRETROPATH "--savestate" $ROMPATH -c "/etc/retroarch.cfg" "--save" $ROMPATH 
+
+      if [ $# -eq 1 ]
+       then
+        aoss snes9x "$FULLPATH"
+       else
+        $EMULATIONCMD "$FULLPATH"  -L $LIBRETROPATH "--savestate" $ROMPATH -c "/etc/retroarch.cfg" "--save" $ROMPATH 
+       fi
    else
-    emulationstation
+    sudo emulationstation
    fi
 else
- emulationstation
+ sudo emulationstation
 fi
