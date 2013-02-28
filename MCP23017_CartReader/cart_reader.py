@@ -70,6 +70,7 @@ def gotoOffset(offset,isLowROM):
  
 gotoOffset.currentOffset = 0
 
+
   
 def readOffset(offset,isLowROM):
  gotoOffset(offset,isLowROM)
@@ -129,6 +130,39 @@ def returnNULLheader():
  for x in range(0, 512):
   charStr += chr(0x00)
  return charStr
+
+def CX4setROMsize(ROMsize):
+ gotoOffset(0x007F52,0)
+ ROMsizeRegister = readData()
+ print "$007F52 offset reads    " + str( ROMsizeRegister )
+ cart.write_byte_data(_SNESBankAndData,IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
+ cart.write_byte_data(_IOControls,GPIOA,0x03)#reset + /RD high
+ # GPA0: /RD
+ # GPA1: /RESET
+ # GPA2: /WR
+ # GPA3: /CS
+ # GPA4: CART MOSFET
+ # GPA7: /IRQ
+
+ if ROMsize > 8:
+  if ROMsizeRegister == 1:
+   print "ROM is larger than 8 megs, writing 0x00 to CX4 register"
+   cart.write_byte_data(_SNESBankAndData,GPIOB,0x00)
+  else:
+   print "CX4 register is at correct value, will not change"
+
+ else:
+  if ROMsizeRegister == 1:  
+   print "CX4 register is at correct value, will not change"
+  else:
+   print "ROM is 8 megs, writing 0x01 to CX4 register"
+   cart.write_byte_data(_SNESBankAndData,GPIOB,0x01)
+
+ cart.write_byte_data(_IOControls,GPIOA,0x06)#reset + /WR high
+ cart.write_byte_data(_SNESBankAndData,IODIRB,0xFF) # Set MCP bank B to back to inputs  (SNES Data 0-7)
+ print "$007F52 offset now reads " + str( readData() )
+
+ 
  
 def ripROM (startBank, isLowROM,numberOfPages):
   #cart.write_byte_data(_IOControls,GPIOA,0x04)
@@ -318,6 +352,14 @@ print "ROM Makeup:         " + str(ROMmakeup)
 print " - ROM Speed:       " + str(ROMspeed)
 print " - Bank Size:       " + str(bankSize)
 print "ROM Type:           " + str(ROMtype)
+
+if ROMtype == 243:
+ print ""
+ print "Capcom CX4 ROM Type detected!"
+ CX4setROMsize(ROMsize)
+ print ""
+ 
+
 print "ROM Size:           " + str(ROMsize) + " Mbits"
 print "SRAM Size:          " + str(SRAMsize)
 print "Country:            " + str(country)
@@ -361,6 +403,7 @@ else:
  
 g.close
 
+#isValid = 0
  
 if isValid == 1:
  timeStart = time.time()
