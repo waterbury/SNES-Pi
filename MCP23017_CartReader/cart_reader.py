@@ -200,8 +200,19 @@ def ripROM (startBank, isLowROM,numberOfPages):
  
 ripROM.totalChecksum = 0
 
-def ripSRAM(SRAMsize, isLowROM)
- return 1
+def ripSRAM(SRAMsize, isLowROM):
+ SRAMdump = ""
+ pageChecksum = 0
+ currentByte = 0
+ bank = 0
+ SRAMsize = (SRAMsize / 8) * 1024
+
+ while SRAMsize > currentByte:
+  currentByte += 1
+
+ print str(currentByte) + " SRAM bytes read"
+
+ return SRAMdump
 
 
 
@@ -219,7 +230,7 @@ for opt, arg in opts:
   directory = arg
  elif opt in ("-S"):
   readSRAM = 1
-  readCART = 0
+  readCart = 0
 
 
 #if __name__ == "__main__":
@@ -396,12 +407,15 @@ if directory != "" :
 
 g = open("/tmp/insertedCart",'w')
 if isValid == 1:
-  g.write(cartname)
+ g.write(cartname)
 
- if os.path.exists(directory + cartname + '.smc') and readCart == 1:
-  print "Cart has already been ripped, not ripping again!"
-  readCart = 0
-  
+ if readCart == 1:
+  if os.path.exists(directory + cartname + '.smc'):
+   print "Cart has already been ripped, not ripping again!"
+   readCart = 0
+ elif readCart == 0:  
+  print("Will not rip cart due to Opts")
+   
  if readCart == 1:   
   numberOfRemainPages = 0
   firstNumberOfPages = numberOfPages 
@@ -457,11 +471,9 @@ if isValid == 1:
   f.write(dump)
   f.close
   
- 
- 
 else:
-  g.write("NULL")     
-g.close 
+ g.write("NULL")
+ g.close
 
 
 
