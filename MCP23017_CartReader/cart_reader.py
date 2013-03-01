@@ -200,6 +200,9 @@ def ripROM (startBank, isLowROM,numberOfPages):
  
 ripROM.totalChecksum = 0
 
+def ripSRAM(SRAMsize, isLowROM)
+ return 1
+
 
 
 directory = ""
@@ -392,67 +395,73 @@ if directory != "" :
   directory += "/"
 
 g = open("/tmp/insertedCart",'w')
-
 if isValid == 1:
- g.write(cartname)
- if os.path.exists(directory + cartname + '.smc'):
+  g.write(cartname)
+
+ if os.path.exists(directory + cartname + '.smc') and readCart == 1:
   print "Cart has already been ripped, not ripping again!"
-  isValid = 0
-
-else:
- g.write("NULL")
- 
-g.close
-
-#isValid = 0
- 
-if isValid == 1:
- timeStart = time.time()
- numberOfRemainPages = 0
- firstNumberOfPages = numberOfPages
- f = open(directory + cartname + '.smc','w')
+  readCart = 0
+  
+ if readCart == 1:   
+  numberOfRemainPages = 0
+  firstNumberOfPages = numberOfPages 
+  timeStart = time.time()
+  
+  f = open(directory + cartname + '.smc','w')
 
  
- if isLowROM == 1:    
-  print "Reading " + str(numberOfPages) + " Low ROM pages."
+  if isLowROM == 1:    
+   print "Reading " + str(numberOfPages) + " Low ROM pages."
 
-  dump = ripROM(0x00, isLowROM, firstNumberOfPages)
- 
- else:
-  if numberOfPages > 64:
-   numberOfRemainPages = ( numberOfPages - 64 ) # number of pages over 64
-   print "Reading first 64 of " + str(numberOfPages) + " Hi ROM pages."
-   firstNumberOfPages = 64
+   dump = ripROM(0x00, isLowROM, firstNumberOfPages)
+  
   else:
-   print "Reading " + str(numberOfPages) + " Hi ROM pages."
+   if numberOfPages > 64:
+    numberOfRemainPages = ( numberOfPages - 64 ) # number of pages over 64
+    print "Reading first 64 of " + str(numberOfPages) + " Hi ROM pages."
+    firstNumberOfPages = 64
+   else:
+    print "Reading " + str(numberOfPages) + " Hi ROM pages."
 
-  dump = ripROM(0xC0, isLowROM, firstNumberOfPages) 
+   dump = ripROM(0xC0, isLowROM, firstNumberOfPages) 
 
-  if numberOfRemainPages > 0:
-   print "Reading last " + str(numberOfRemainPages) + " of High ROM pages."
-   dump += ripROM(0x40, isLowROM, numberOfRemainPages)
+   if numberOfRemainPages > 0:
+    print "Reading last " + str(numberOfRemainPages) + " of High ROM pages."
+    dump += ripROM(0x40, isLowROM, numberOfRemainPages)
 
- print ""
- print "Entire Checksum:             " + str( hex( ripROM.totalChecksum ) )
- print ""
- print "Header Checksum:             " + str( hex( ROMchecksum ) )
+  print ""
+  print "Entire Checksum:             " + str( hex( ripROM.totalChecksum ) )
+  print ""
+  print "Header Checksum:             " + str( hex( ROMchecksum ) )
 
- ripROM.totalChecksum = ( ripROM.totalChecksum & 0xFFFF )
+  ripROM.totalChecksum = ( ripROM.totalChecksum & 0xFFFF )
 
- print "16-bit Generated Checksum:   " + str( hex( ripROM.totalChecksum ) )
+  print "16-bit Generated Checksum:   " + str( hex( ripROM.totalChecksum ) )
 
- if ripROM.totalChecksum == ROMchecksum:
-  print "--------------------------   CHECKSUMS MATCH!"
- else:
-  print "----------WARNING: CHECKSUMS DO NOT MATCH: " +str( hex( ripROM.totalChecksum ) ) + " != " +  str( hex( ROMchecksum ) )
-   
-   
- timeEnd = time.time()
- print ""
- print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
+  if ripROM.totalChecksum == ROMchecksum:
+   print "--------------------------   CHECKSUMS MATCH!"
+  else:
+   print "----------WARNING: CHECKSUMS DO NOT MATCH: " +str( hex( ripROM.totalChecksum ) ) + " != " +  str( hex( ROMchecksum ) )
+    
+    
+  timeEnd = time.time()
+  print ""
+  print "It took " + str(timeEnd - timeStart) + "seconds to read cart"
 
- f.write(dump)
- f.close
+  f.write(dump)
+  f.close
+ 
+ if readSRAM == 1:
+  f = open(directory + cartname + '.srm','w')
+  dump = ripSRAM(SRAMsize,isLowROM)
+  f.write(dump)
+  f.close
+  
+ 
+ 
+else:
+  g.write("NULL")     
+g.close 
 
 
 
