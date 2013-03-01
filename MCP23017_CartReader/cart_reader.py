@@ -203,14 +203,21 @@ ripROM.totalChecksum = 0
 
 
 directory = ""
+readSRAM = 0
+readCart = 1
+
 try:
- opts, args = getopt.getopt(sys.argv[1:],"d:",["directory="])
+ opts, args = getopt.getopt(sys.argv[1:],"Sd:",["directory="])
 except getopt.GetoptError:
- print "Usage: cart_reader.py -d <optional directory>"
+ print "Usage: cart_reader.py -d <optional directory> -S (Reads only SRAM)"
  sys.exit(2)
 for opt, arg in opts:
  if opt in ("-d","--directory"):
   directory = arg
+ elif opt in ("-S"):
+  readSRAM = 1
+  readCART = 0
+
 
 #if __name__ == "__main__":
 #  main(sys.argv[1:])
@@ -314,8 +321,8 @@ bankSize = getLowNibble(ROMmakeup)
 ROMtype   =  readAddr(headerAddr + 22,isLowROM)
 ROMsize   =  getROMsize(headerAddr + 23, isLowROM)
 SRAMsize  =  readAddr(headerAddr + 24,isLowROM)
-if SRAMsize <= 8 && SRAMsize > 0: 
- SRAMsize  =  1<<SRAMsize
+if SRAMsize <= 8 and SRAMsize > 0: 
+ SRAMsize  =  1<<(SRAMsize +3)
 country   =  readAddr(headerAddr + 25,isLowROM)
 license   =  readAddr(headerAddr + 26,isLowROM)
 version   =  readAddr(headerAddr + 27,isLowROM)
@@ -354,8 +361,8 @@ if ROMtype == 243:
  print ""
  
 
-print "ROM Size:           " + str(ROMsize) + " Mbits"
-print "SRAM Size:          " + str(SRAMsize) + "KBits"
+print "ROM Size:           " + str(ROMsize) + "  MBits"
+print "SRAM Size:          " + str(SRAMsize) + " KBits"
 print "Country:            " + str(country)
 print "License:            " + str(license)
 print "Version:            " + str(version)
