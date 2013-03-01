@@ -13,22 +13,16 @@ def gotoAddr(addr,isLowROM):
   lowByte = addr - (upByte * 256)
   
   if isLowROM != 0:
-   upByte = upByte + 0x80
-   #print "UpByte LowROM: " + str((upByte))
-  #else:
-  # print "UpByte hiROM: " + str((upByte))
+   upByte = upByte | 0x80 # ORs a 1 to A15 if LoROM
 
   if gotoAddr.currentUpByte != upByte:
    cart.write_byte_data(_SNESAddressPins,GPIOB,upByte)
    gotoAddr.currentUpByte = upByte
-   #time.sleep(0.05)
-   #print "current upByte: " + str( upByte )
    
   if gotoAddr.currentLowByte != lowByte: 
    cart.write_byte_data(_SNESAddressPins,GPIOA,lowByte)
    gotoAddr.currentLowByte = lowByte
-   #time.sleep(.05)
-   #print "current lowByte: " + str( lowByte )
+   
  else:
   cart.write_byte_data(_SNESAddressPins,GPIOA,0x00)
   cart.write_byte_data(_SNESAddressPins,GPIOB,0x00)
@@ -190,8 +184,6 @@ def ripROM (startBank, isLowROM,numberOfPages):
    currentByte = readData()
    ROMdump += chr(currentByte)
    pageChecksum += currentByte 
-   #----- Debug
-   #print  "Offset :" + str(hex(gotoOffset.currentOffset))  +"| Bank: " + str(hex(gotoBank.currentBank)) + "| Upper Byte: " + str(hex(gotoAddr.currentUpByte)) + " | Lower Byte: " + str(hex(gotoAddr.currentLowByte)) 
    offset += 1 #Increment offset
    gotoOffset(offset,isLowROM) #goto new offset
  
@@ -322,6 +314,8 @@ bankSize = getLowNibble(ROMmakeup)
 ROMtype   =  readAddr(headerAddr + 22,isLowROM)
 ROMsize   =  getROMsize(headerAddr + 23, isLowROM)
 SRAMsize  =  readAddr(headerAddr + 24,isLowROM)
+if SRAMsize <= 8 && SRAMsize > 0: 
+ SRAMsize  =  1<<SRAMsize
 country   =  readAddr(headerAddr + 25,isLowROM)
 license   =  readAddr(headerAddr + 26,isLowROM)
 version   =  readAddr(headerAddr + 27,isLowROM)
@@ -361,7 +355,7 @@ if ROMtype == 243:
  
 
 print "ROM Size:           " + str(ROMsize) + " Mbits"
-print "SRAM Size:          " + str(SRAMsize)
+print "SRAM Size:          " + str(SRAMsize) + "KBits"
 print "Country:            " + str(country)
 print "License:            " + str(license)
 print "Version:            " + str(version)
