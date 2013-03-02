@@ -3,7 +3,7 @@ ROMPATH=/home/pi/RetroPie/roms/snes/
 USERHOME=/home/pi/
 
 
-python "$USERHOME"SNES-Pi/MCP23017_CartReader/cart_reader.py -d "$ROMPATH"
+python "$USERHOME"SNES-Pi/MCP23017_CartReader/cart_reader.py -s -d "$ROMPATH"
 LIBRETROPATH="/home/pi/RetroPie/emulatorcores/pocketsnes-libretro/libretro.so"
 EMULATIONCMD="retroarch "
 

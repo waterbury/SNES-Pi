@@ -11,6 +11,7 @@ def gotoAddr(addr,isLowROM):
  if addr <= 0xffff: 
   upByte = int(addr/256)
   lowByte = addr - (upByte * 256)
+  gotoAddr.currentAddr = addr
   
   if isLowROM != 0:
    upByte = upByte | 0x80 # ORs a 1 to A15 if LoROM
@@ -21,11 +22,12 @@ def gotoAddr(addr,isLowROM):
    
   if gotoAddr.currentLowByte != lowByte: 
    cart.write_byte_data(_SNESAddressPins,GPIOA,lowByte)
-   gotoAddr.currentLowByte = lowByte
+   gotoAddr.currentLowByte = lowByte  
    
  else:
   cart.write_byte_data(_SNESAddressPins,GPIOA,0x00)
   cart.write_byte_data(_SNESAddressPins,GPIOB,0x00)
+  gotoAddr.currentAddr = 0
 
 gotoAddr.currentAddr = -1
 gotoAddr.currentUpByte = -1
@@ -200,15 +202,61 @@ def ripROM (startBank, isLowROM,numberOfPages):
  
 ripROM.totalChecksum = 0
 
-def ripSRAM(SRAMsize, isLowROM):
+def ripSRAM(SRAMsize, ROMsize, isLowROM):
  SRAMdump = ""
  pageChecksum = 0
  currentByte = 0
- bank = 0
- SRAMsize = (SRAMsize / 8) * 1024
+ bank = 0 
+
+ startBank = 0
+ startAddr = 0
+ endAddr   = 0x7FFF
+ 
+ #isLowROM = 1
+ 
+ if isLowROM == 1:
+  startBank = 0x70  
+  startAddr = 0x0000
+  endAddr   = 0x7FFF
+ else: 
+  startBank = 0x20
+  startAddr = 0x6000
+  endAddr   = 0x7FFF
+
+# if ROMsize > 16 or SRAMsize > 32:
+#  startBank = 0xF0
+#  startAddr = 0x0000
+#  endAddr   = 0x7FFF
+# else:
+#  startBank = 0x70
+#  startAddr = 0x0000
+#  endAddr   = 0xFFFF
+
+ SRAMsize = (SRAMsize / 8.0) * 1024
+ gotoBank(startBank)
+ gotoAddr(startAddr,0)
+  
+ cart.write_byte_data(_IOControls,GPIOA,0x06)# RESET + /WR high
+ # GPA0: /RD
+ # GPA1: /RESET
+ # GPA2: /WR
+ # GPA3: /CS
+ # GPA4: CART MOSFET
+ # GPA7: /IRQ
 
  while SRAMsize > currentByte:
   currentByte += 1
+  SRAMdump += chr( readData() )
+
+  if gotoAddr.currentAddr >= endAddr:
+   gotoBank( gotoBank.currentBank + 1)
+   gotoAddr(startAddr,0)
+  else:  
+   gotoAddr( gotoAddr.currentAddr +1, 0)
+
+
+ cart.write_byte_data(_IOControls,GPIOA,0x06)#reset + /WR high
+
 
  print str(currentByte) + " SRAM bytes read"
 
@@ -221,7 +269,7 @@ readSRAM = 0
 readCart = 1
 
 try:
- opts, args = getopt.getopt(sys.argv[1:],"Sd:",["directory="])
+ opts, args = getopt.getopt(sys.argv[1:],"Ssd:",["directory="])
 except getopt.GetoptError:
  print "Usage: cart_reader.py -d <optional directory> -S (Reads only SRAM)"
  sys.exit(2)
@@ -231,6 +279,10 @@ for opt, arg in opts:
  elif opt in ("-S"):
   readSRAM = 1
   readCart = 0
+ elif opt in ("-s"):
+  readSRAM = 1
+  readCart = 1
+
 
 
 #if __name__ == "__main__":
@@ -414,7 +466,7 @@ if isValid == 1:
    print "Cart has already been ripped, not ripping again!"
    readCart = 0
  elif readCart == 0:  
-  print("Will not rip cart due to Opts")
+  print("Will not rip cart due to OPTs")
    
  if readCart == 1:   
   numberOfRemainPages = 0
@@ -467,7 +519,13 @@ if isValid == 1:
  
  if readSRAM == 1:
   f = open(directory + cartname + '.srm','w')
-  dump = ripSRAM(SRAMsize,isLowROM)
+
+  timeStart = time.time()
+  dump = ripSRAM(SRAMsize,ROMsize,isLowROM)
+  timeEnd = time.time()
+
+  print ""
+  print "It took " + str(timeEnd - timeStart) + "seconds to read SRAM Data"
   f.write(dump)
   f.close
   
