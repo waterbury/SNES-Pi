@@ -210,39 +210,22 @@ def ripSRAM(SRAMsize, ROMsize, isLowROM):
 
  startBank = 0
  startAddr = 0
- endAddr   = 0x7FFF
- 
- #isLowROM = 1
+ endAddr   = 0x7FFF 
  
  if isLowROM == 1:
   startBank = 0x70  
   startAddr = 0x0000
   endAddr   = 0x7FFF
- else: 
-  startBank = 0x20
+ else: #Else, is HiROM
+  startBank = 0x30
   startAddr = 0x6000
   endAddr   = 0x7FFF
-
-# if ROMsize > 16 or SRAMsize > 32:
-#  startBank = 0xF0
-#  startAddr = 0x0000
-#  endAddr   = 0x7FFF
-# else:
-#  startBank = 0x70
-#  startAddr = 0x0000
-#  endAddr   = 0xFFFF
-
+  cart.write_byte_data(_IOControls,GPIOA,0x0E)# RESET + /WR + /CS high
+  # GPA7: /IRQ | GPA4: CART MOSFET | GPA3: /CS | GPA2: /WR | GPA1: /RESET  | GPA0: /RD
+  
  SRAMsize = (SRAMsize / 8.0) * 1024
  gotoBank(startBank)
  gotoAddr(startAddr,0)
-  
- cart.write_byte_data(_IOControls,GPIOA,0x06)# RESET + /WR high
- # GPA0: /RD
- # GPA1: /RESET
- # GPA2: /WR
- # GPA3: /CS
- # GPA4: CART MOSFET
- # GPA7: /IRQ
 
  while SRAMsize > currentByte:
   currentByte += 1
@@ -254,9 +237,8 @@ def ripSRAM(SRAMsize, ROMsize, isLowROM):
   else:  
    gotoAddr( gotoAddr.currentAddr +1, 0)
 
-
  cart.write_byte_data(_IOControls,GPIOA,0x06)#reset + /WR high
-
+ # GPA7: /IRQ | GPA4: CART MOSFET | GPA3: /CS | GPA2: /WR | GPA1: /RESET  | GPA0: /RD
 
  print str(currentByte) + " SRAM bytes read"
 
@@ -267,15 +249,23 @@ def ripSRAM(SRAMsize, ROMsize, isLowROM):
 directory = ""
 readSRAM = 0
 readCart = 1
+convertedSRAMsize = 0
+val =0
 
 try:
- opts, args = getopt.getopt(sys.argv[1:],"Ssd:",["directory="])
+ opts, args = getopt.getopt(sys.argv[1:],"Ssz:d:",["directory="])
 except getopt.GetoptError:
  print "Usage: cart_reader.py -d <optional directory> -S (Reads only SRAM)"
  sys.exit(2)
 for opt, arg in opts:
  if opt in ("-d","--directory"):
   directory = arg
+ if opt in ("-z"):
+  val = int(arg)
+  if val > 256 or val < 0:
+   convertedSRAMsize = 0
+  else:
+   convertedSRAMsize = val
  elif opt in ("-S"):
   readSRAM = 1
   readCart = 0
@@ -387,8 +377,6 @@ bankSize = getLowNibble(ROMmakeup)
 ROMtype   =  readAddr(headerAddr + 22,isLowROM)
 ROMsize   =  getROMsize(headerAddr + 23, isLowROM)
 SRAMsize  =  readAddr(headerAddr + 24,isLowROM)
-if SRAMsize <= 8 and SRAMsize > 0: 
- SRAMsize  =  1<<(SRAMsize +3)
 country   =  readAddr(headerAddr + 25,isLowROM)
 license   =  readAddr(headerAddr + 26,isLowROM)
 version   =  readAddr(headerAddr + 27,isLowROM)
@@ -428,10 +416,16 @@ if ROMtype == 243:
  
 
 print "ROM Size:           " + str(ROMsize) + "  MBits"
-print "SRAM Size:          " + str(SRAMsize) + " KBits"
+
+print "SRAM Size:          " + "Value: " + str(SRAMsize),
+if convertedSRAMsize == 0:
+ if SRAMsize <= 12 and SRAMsize > 0:
+  convertedSRAMsize  =  1<<(SRAMsize +3)
+print " | " + str(convertedSRAMsize) +  " KBits"
+
 print "Country:            " + str(country)
 print "License:            " + str(license)
-print "Version:            " + str(version)
+print "Version:            1." + str(version)
 print "Inverse Checksum:   " + str(hex(inverseChecksum))
 print "ROM Checksum:       " + str(hex(ROMchecksum))
 print " - Checksums xOr'ed:   " + str( hex(inverseChecksum | ROMchecksum) )
@@ -521,7 +515,7 @@ if isValid == 1:
   f = open(directory + cartname + '.srm','w')
 
   timeStart = time.time()
-  dump = ripSRAM(SRAMsize,ROMsize,isLowROM)
+  dump = ripSRAM(convertedSRAMsize,ROMsize,isLowROM)
   timeEnd = time.time()
 
   print ""
