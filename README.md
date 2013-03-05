@@ -2,7 +2,7 @@ SNES-Pi
 =======
 
 Super Nintendo Emulated System
-
+http://familab.org/blog/2012/12/snes-super-nintendo-emulated-system/
 
 cart_reader.py -
  Acts as python based cartridge reader, using MCP23017 chips connected to Raspberry Pi's I2C bus. The filname 
