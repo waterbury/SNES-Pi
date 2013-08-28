@@ -12,23 +12,27 @@ def readData():
  setPin(RD_PIN)
  clrPin(WR_PIN)
  commitPins()
- apu.write_byte_data(_SNES_APU, IODIRB,0xFF) # Set MCP bank B to inputs (DATA 0-7)
+ setDataDirection(1)
  return apu.read_byte_data(_SNES_APU,GPIOB)
 
+def setDataDirection(direction):
+ if direction == 1:
+  if setDataDirection.current != direction:
+   apu.write_byte_data(_SNES_APU, IODIRB,0xFF) # Set MCP bank B to inputs (DATA 0-7)
+   setDataDirection.current = direction
+ elif direction == 0:
+  if setDataDirection.current != direction:
+   apu.write_byte_data(_SNES_APU, IODIRB,0x00) # Set MCP bank B to outputs (DATA 0-7)
+   setDataDirection.current = direction
+setDataDirection.current = -1 
+
 def writeStatus(dataByte):
- setPin(WR_PIN)
- clrPin(RD_PIN)
  gotoAddr(2140)
  write_8bit(dataByte)
 
 def readAddr(addr):
  gotoAddr(addr)
  return readData()
-
-
-
- apu.write_byte_data(_SNES_APU, IODIRB,0x00) # Set MCP bank B to inputs (DATA 0-7)
- return apu.read_byte_data(_SNES_APU,GPIOB)
 
 def gotoAddr(addr):
  setPin(WR_PIN)
@@ -53,14 +57,15 @@ def setPin(pin):
 def clrPin(pin):
  setPin(pin)
  commitPins.pins = commitPins.pins ^ pin
- 
 
 def commitPins():
-  apu.write_byte_data(_SNES_APU, GPIOA,commitPins.pins)
-  #print bin(commitPins.pins) 
+  if commitPins.pins != commitPins.pins_previous:
+   apu.write_byte_data(_SNES_APU, GPIOA,commitPins.pins)
+   #print "Committed: ",
+   #print bin(commitPins.pins) 
+   commitPins.pins_previous = commitPins.pins
 commitPins.pins = 0
-
-
+commitPins.pins_previous = 0
 
 
 def resetAPU():
@@ -81,9 +86,7 @@ def initAPU():
 def write_16bit(packet):
  packet_low = packet & 0xFF 
  packet_high = (packet & 0xFF00) >> 8
- setPin(WR_PIN)
- clrPin(RD_pin)
-
+ 
  gotoAddr(2142)
  write_8bit(packet_low)
  gotoAddr(2143)
@@ -91,7 +94,10 @@ def write_16bit(packet):
  
 
 def write_8bit(dataByte):
- apu.write_byte_data(_SNES_APU, IODIRB,0x00) # Set MCP bank B to outputs (DATA 0-7)
+ setPin(WR_PIN)
+ clrPin(RD_PIN)
+ commitPins()
+ setDataDirection(0)
  apu.write_byte_data(_SNES_APU, GPIOB, dataByte) 
 
  
@@ -148,22 +154,16 @@ GPPUB   = 0x0D
 
 apu = smbus.SMBus(0)
 
-apu.write_byte_data(_SNES_APU, IODIRB,0xFF) # Set MCP bank B to inputs (DATA 0-7)
+setDataDirection(1) # Set MCP bank B to inputs (DATA 0-7)
  
-# GPA0: /RESET
-# GPA3: /RESET LED
-# GPA4: RD_PIN
-# GPA5: WR_PIN
-# GPA6: ADDR1
-# GPA7: ADDR0 
-RESET_PIN = 0X01
-RESET_LED = 0X08
-RD_PIN = 0X10
-WR_PIN = 0X20
-ADDR_1 = 0X40
-ADDR_0 = 0X80
+RESET_PIN = 0X01 # GPA0: /RESET
+RESET_LED = 0X08 # GPA3: /RESET LED
+RD_PIN = 0X10 # GPA4: RD_PIN
+WR_PIN = 0X20 # GPA5: WR_PIN
+ADDR_1 = 0X40 # GPA6: ADDR1
+ADDR_0 = 0X80 # GPA7: ADDR0
 
-STATUS =2140
+STATUS = 2140
 COMMAND = 2141
 ADDR_HIGH = 2143
 ADDR_LOW = 2142
@@ -176,30 +176,34 @@ apu.write_byte_data(_SNES_APU, IODIRA,0x00) # Set MCP bank A to outputs
 
 #----------------------------------------------------------------------------------------------------
 initAPU()
-time.sleep(.25)
+time.sleep(.1)
 
 #-----------------------------------------------------
 
-#setPin(RESET_PIN)
-#commitPins()
-
-
 
 timeStart = time.time()
-#time.sleep(1)
 print format( readAddr(2140), '02x')
 print format( readAddr(2141), '02x')
 writeStatus(0xcc)
 print format( readAddr(2140), '02x')
 
 
-for x in range(0, 256):
- setPin(WR_PIN)
- clrPin(RD_PIN)
+for x in range(0, 16):
  writeStatus(x)#write incrementor to status
- print format( readAddr(2140), '02x')#read incrementor
  gotoAddr(2141)#goto data addr
- write_8bit(182)#write data
+ write_8bit(x)#write data
+ print format( readAddr(2140), '02x')
+ 
+
+for x in range(0, 128):
+ writeStatus(x)#write incrementor to status
+ gotoAddr(2141)#goto data addr
+ write_8bit(x)#write data
+ print format( readAddr(2140), '02x')
+
+
+#print format( readAddr(2142), '02x')
+
   
     
 timeEnd = time.time()
