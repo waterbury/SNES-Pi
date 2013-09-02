@@ -1,0 +1,15 @@
+- How To Compile
+
+First, do a './configure'.
+
+The ppdev support will be enabled if the
+correct header files are detected. The same thing
+applies to the direct io method.
+
+To build the command line version, type 'make'.
+
+To build the xmms plugin, type 'make xmms'. 
+
+To install the xmms plugin, copy the hwapu.so file
+into ~/.xmms/Plugins/Input or for global installation,
+copy the file into the directory returned by 'xmms-config --plugin-dir'

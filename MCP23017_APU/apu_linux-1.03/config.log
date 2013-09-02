@@ -1,0 +1,11 @@
+This file contains any messages produced by compilers while
+running configure, to aid debugging if configure makes a mistake.
+
+configure:527: checking how to run the C preprocessor
+configure:548: cc -E  conftest.c >/dev/null 2>conftest.out
+configure:610: checking for linux/ppdev.h
+configure:620: cc -E  conftest.c >/dev/null 2>conftest.out
+configure:610: checking for linux/parport.h
+configure:620: cc -E  conftest.c >/dev/null 2>conftest.out
+configure:610: checking for sys/io.h
+configure:620: cc -E  conftest.c >/dev/null 2>conftest.out

@@ -1,0 +1,7 @@
+AC_INIT(apu.h)
+
+AC_CHECK_HEADERS(linux/ppdev.h linux/parport.h sys/io.h)
+
+AC_CONFIG_HEADER(config.h)
+
+AC_OUTPUT(Makefile)

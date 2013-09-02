@@ -1,0 +1,30 @@
+**** v1.03
+Features:
+- Added a configure script
+- Linux ppdev support (enabled if configure detects linux/ppdev.h and
+  linux/parport.h)
+- Added -d to enable debug messages
+- Status line is now enabled by default, -s disables it.
+- Added djgpp makefile and config.h in the dos/ subdirectory
+- Added xmms support (ppdev only)
+- Added color to the command line interface (Linux only)
+- The code is now clealy licensed as GPL
+
+Code changes/clean ups:
+- Operations done with apu are all in apu.c, and begins with apu_*
+- IO function to control apu (read/write/reset/init) are now provided 
+  to apu.c by the means of struct of function pointers.
+- Added a new apuplay algorithm (see apuplay_embedded.c) designed for
+  small embedded systems. It uses around 103 bytes of stack memory 
+  (used more than 64k with the original algorithm). It is provided
+  mostly for reference, there is no point to use it on a PC.
+
+**** v1.02 (Sun Mar 6, 2005):
+- Added support for DJGPP.
+
+**** v1.01 (Sat Mar 5, 2005):
+- Changed hardcoded offsets in arrays by meaningful names and added
+comments about what is done. It is way easier to understand the code.
+
+**** v1.0 (Thu Nov 25, 2004): Initial release
+
