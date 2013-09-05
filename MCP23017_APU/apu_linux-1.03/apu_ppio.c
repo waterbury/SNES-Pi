@@ -24,6 +24,7 @@
 #include <stdio.h>
 
 #include "parport.h"
+#include "MCP23X17_outb-inb.h"
 
 int ByteTransferCount=0;
 int ParallelPortCount=0;

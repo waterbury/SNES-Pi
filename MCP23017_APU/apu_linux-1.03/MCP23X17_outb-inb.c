@@ -8,6 +8,9 @@
 //#include "mcp23x0817.h"
 #include <wiringPi.h>
 #include <mcp23s17.h>
+#include "MCP23X17_outb-inb.h"
+#include <time.h>
+
 
 #define KNRM  "\x1B[0m"
 #define KRED  "\x1B[31m"
@@ -56,19 +59,33 @@
 #define ORIG_WR_PIN 0x04
 #define ORIG_RD_PIN 0x08
 
-#define GPIO_RD_PIN 3
-#define GPIO_WR_PIN 2
-#define GPIO_ADDR_0 7
-#define GPIO_ADDR_1 0
-#define GPIO_RESET  5
-#define GPIO_LVLSFT_EN 4
+#define GPIO_RD_PIN 4 //3
+#define GPIO_WR_PIN 5 //2
+#define GPIO_ADDR_0 6 //7
+#define GPIO_ADDR_1 10 //0
+#define GPIO_RESET  1 //5
+#define GPIO_LVLSFT_EN 11 //4
 
-#define MCPBASE    123
+
+#define GPIO_DATA_DIR  8
+
+#define GPIO_DATA_D0      14
+#define GPIO_DATA_D1      13
+#define GPIO_DATA_D2      12
+#define GPIO_DATA_D3      3
+#define GPIO_DATA_D4      2
+#define GPIO_DATA_D5      0
+#define GPIO_DATA_D6      7
+#define GPIO_DATA_D7      9
+
 #define devId 0
-#define	CMD_WRITE	0x40
-#define CMD_READ	0x41
-#define USE_SPI_MODE      1
+#define CMD_WRITE         0x40
+#define CMD_READ          0x41
+#define USE_SPI_MODE      0
+#define USE_I2C_MODE      0
 #define USE_GPIO_CONTROL  1
+#define USE_GPIO_DATA     1
+
 #define DEBUG_MODE        0
 
 //#define	MCP_SPEED	4000000
@@ -86,6 +103,45 @@ const char *byte_to_binary(int x)
 
     return b;
 }
+
+
+
+void nSleep(int nanosecs)
+{
+      struct timespec slptm;
+    slptm.tv_sec = 0;
+    slptm.tv_nsec = nanosecs;      //1000 ns = 1 us
+    nanosleep(&slptm,NULL);
+
+}
+
+
+
+void write_GPIO_data(uint8_t data)
+{
+int i = 0;
+int bits[8] = {0};
+
+for (i=0;i<8;i++)
+ if( (data & (1<<i) ) == (1<<i) )
+   bits[i] = 1;   
+
+digitalWrite(GPIO_DATA_D0, bits[0]); 
+digitalWrite(GPIO_DATA_D1, bits[1]);
+digitalWrite(GPIO_DATA_D2, bits[2]);
+digitalWrite(GPIO_DATA_D3, bits[3]);
+digitalWrite(GPIO_DATA_D4, bits[4]);
+digitalWrite(GPIO_DATA_D5, bits[5]);
+digitalWrite(GPIO_DATA_D6, bits[6]);
+digitalWrite(GPIO_DATA_D7, bits[7]);
+delayMicroseconds(5);
+//nSleep(100);
+}
+
+
+
+
+
 
 void write_GPIO_CONTROL(uint8_t data)
  {
@@ -141,7 +197,7 @@ void write_GPIO_CONTROL(uint8_t data)
     previous_RESET_PIN = current_RESET_PIN;
   }
 
- //printf("current_PA1_PIN: %i\n", current_PA1_PIN);
+delayMicroseconds(5);
  }
 
 
@@ -156,7 +212,7 @@ void write_MCP23017(int MCPregister, uint8_t data)
 
 void write_MCP23S17(int MCPregister, uint8_t data)
  {
-  init_MCP23S17();
+  initAll();
   uint8_t spiData [4] ;
 
   spiData [0] = CMD_WRITE | ((devId & 7) << 1) ;
@@ -171,7 +227,7 @@ uint8_t read_MCP23017_data()
   int fd = 0;
   uint8_t data = 0;
   int value =0;
-  fd = init_MCP23017(CHIPADDR);
+  fd = initAll();
   value = wiringPiI2CReadReg8 (fd, GPIOB);
   data = (uint8_t)value;
   return data;
@@ -179,7 +235,7 @@ uint8_t read_MCP23017_data()
 
 uint8_t read_MCP23S17_data()
  {
- init_MCP23S17();
+ initAll();
  uint8_t spiData [4] ;
 
   spiData [0] = CMD_READ | ((devId & 7) << 1) ;
@@ -190,6 +246,35 @@ uint8_t read_MCP23S17_data()
   return spiData [2] ;
  }
 
+uint8_t read_gpio_data()
+{
+uint8_t data = 0;
+
+
+delayMicroseconds(5);
+
+  if (digitalRead (GPIO_DATA_D7) )
+   data = data| 0x80;
+  if (digitalRead (GPIO_DATA_D6) )
+   data = data| 0x40;
+  if (digitalRead (GPIO_DATA_D5) )
+   data = data| 0x20;
+  if (digitalRead (GPIO_DATA_D4) )
+   data = data| 0x10;
+  if (digitalRead (GPIO_DATA_D3) )
+   data = data| 0x08;
+  if (digitalRead (GPIO_DATA_D2) )
+   data = data| 0x04;
+  if (digitalRead (GPIO_DATA_D1) )
+   data = data| 0x02;
+  if (digitalRead (GPIO_DATA_D0) )
+   data = data| 0x01;
+
+//nSleep();
+//usleep(1);
+return data;
+}
+
 
 int changeDataPortDir(int direction)
 {
@@ -198,9 +283,12 @@ if ( (direction == 1) | (direction == 0) )
  {
   if (direction != currentDirection)
    {
-   if(USE_SPI_MODE)
+   
+   if (USE_GPIO_DATA)
+    change_GPIO_dir(direction);
+   else if(USE_SPI_MODE)
     change_MCP23S17_dir(IODIRB, direction);
-   else
+   else if (USE_I2C_MODE)
     change_MCP23017_dir(IODIRB, direction);
 
    currentDirection = direction;
@@ -209,8 +297,46 @@ if ( (direction == 1) | (direction == 0) )
  return currentDirection;
 }
 
+
+void change_GPIO_dir(int direction)
+{
+
+  if(direction == 1)
+    {
+    pinMode(GPIO_DATA_D0, INPUT);
+    pinMode(GPIO_DATA_D1, INPUT);
+    pinMode(GPIO_DATA_D2, INPUT);
+    pinMode(GPIO_DATA_D3, INPUT);
+    pinMode(GPIO_DATA_D4, INPUT);
+    pinMode(GPIO_DATA_D5, INPUT);
+    pinMode(GPIO_DATA_D6, INPUT);
+    pinMode(GPIO_DATA_D7, INPUT);
+
+    digitalWrite(GPIO_DATA_DIR,0);//A<B
+    //usleep(2);
+    }
+  else if (direction == 0)
+    {
+    digitalWrite(GPIO_DATA_DIR,1);//A>B
+    pinMode(GPIO_DATA_D0, OUTPUT);
+    pinMode(GPIO_DATA_D1, OUTPUT);
+    pinMode(GPIO_DATA_D2, OUTPUT);
+    pinMode(GPIO_DATA_D3, OUTPUT);
+    pinMode(GPIO_DATA_D4, OUTPUT);
+    pinMode(GPIO_DATA_D5, OUTPUT);
+    pinMode(GPIO_DATA_D6, OUTPUT);
+    pinMode(GPIO_DATA_D7, OUTPUT);
+    //usleep(2);
+    }
+//nSleep(100);
+//usleep(1);
+delayMicroseconds(5);
+}
+
+
 void change_MCP23017_dir(int IODIRport, int direction)
 {
+initAll();
 uint8_t value = 0;
 if (direction == 1)
  value = 0xFF;
@@ -222,7 +348,7 @@ write_MCP23017(IODIRport, value);
 
 void change_MCP23S17_dir(int IODIRport, int direction)
 {
- init_MCP23S17();
+ initAll();
  uint8_t value = 0;
  if (direction == 1)
   value = 0xFF;
@@ -274,7 +400,7 @@ return newData;
 void    outb_MCP23X17(uint8_t data,int port)
 {
 static uint8_t previous_data = 0;
-init_MCP23S17();
+initAll();
 
 
 if (port == CONTROL)
@@ -289,32 +415,31 @@ if (port == CONTROL)
 
   if (previous_data != data)//Don't Rewrite control if not needed
    {
-
     if (USE_GPIO_CONTROL == 1)
       write_GPIO_CONTROL(data);
-    else
-     {
-      if (USE_SPI_MODE)
-       write_MCP23S17(GPIOA, data ) ;
-      else
-       write_MCP23017(GPIOA, data ) ;
-     }
+    else if (USE_SPI_MODE)
+      write_MCP23S17(GPIOA, data ) ;
+    else if (USE_I2C_MODE)
+      write_MCP23017(GPIOA, data ) ;
+
+    previous_data = data;
    }
+
   else
    return;
-
-  previous_data = data;
  }
-else if(port == DATA)
+
+else if (port == DATA)
 {
  //changeDataPortDir(0);
  if (changeDataPortDir(-1) == 0)//If in output mode
   {
-     if (USE_SPI_MODE)
-       write_MCP23S17(GPIOB, data ) ;
-      else
-       write_MCP23017(GPIOB, data ) ;
-
+    if (USE_GPIO_DATA)
+     write_GPIO_data(data);
+    else if (USE_SPI_MODE)
+     write_MCP23S17(GPIOB, data ) ;
+    else if (USE_I2C_MODE)
+     write_MCP23017(GPIOB, data ) ;
   }
  else 
   {
@@ -357,9 +482,11 @@ uint8_t data = 0;
 changeDataPortDir(1);
 if (changeDataPortDir(-1) == 1)//input mode
 {
-if (USE_SPI_MODE)
+if (USE_GPIO_DATA)
+ data = read_gpio_data();
+else if (USE_SPI_MODE)
  data = read_MCP23S17_data();
-else
+else if (USE_I2C_MODE)
  data = read_MCP23017_data();
 
 }
@@ -388,7 +515,59 @@ printf("%03u\n%s",data,KWHT);
  return  data;
 }
 
+int initAll()
+{
+static int fd = 0;
+static int hasBeenInit = 0;
 
+if (hasBeenInit)
+ {
+  if (USE_I2C_MODE)
+   return fd;
+  else
+   return 0;
+ } 
+
+else
+ {
+   hasBeenInit = 1;
+ 
+   if(USE_I2C_MODE)
+    fd = init_MCP23017(CHIPADDR);
+   else if (USE_SPI_MODE)
+    init_MCP23S17();
+   else
+    wiringPiSetup () ;
+
+
+   if(USE_GPIO_CONTROL == 1)
+    {
+     //pinMode (GPIO_LVLSFT_EN, OUTPUT) ;
+     pinMode (GPIO_RD_PIN, OUTPUT) ;
+     pinMode (GPIO_WR_PIN, OUTPUT) ;
+     pinMode (GPIO_ADDR_0, OUTPUT) ;
+     pinMode (GPIO_ADDR_1, OUTPUT) ;
+     pinMode (GPIO_RESET,  OUTPUT) ;
+     //digitalWrite (GPIO_LVLSFT_EN, 0) ;
+    }
+
+   if(USE_GPIO_DATA == 1)
+    {
+    //changeDataPortDir(1);
+    pinMode(GPIO_DATA_DIR,OUTPUT);
+    pinMode (GPIO_LVLSFT_EN, OUTPUT) ;
+    digitalWrite (GPIO_LVLSFT_EN, 0) ;
+    changeDataPortDir(1);
+
+    }
+
+
+     if(USE_I2C_MODE)
+      return fd;
+ }
+
+return 0;
+}
 
 
 int init_MCP23017(int chipAddr)
@@ -408,17 +587,7 @@ else//Set up
  fd = wiringPiI2CSetupInterface (device, chipAddr) ;
 
     if(USE_GPIO_CONTROL == 1)
-    {
      write_MCP23017(IODIRA, 0xFF);//Set Port A to inputs (CONTROL)
-     //wiringPiSetupGpio();
-     pinMode (GPIO_LVLSFT_EN, OUTPUT) ;
-     pinMode (GPIO_RD_PIN, OUTPUT) ;
-     pinMode (GPIO_WR_PIN, OUTPUT) ;
-     pinMode (GPIO_ADDR_0, OUTPUT) ;
-     pinMode (GPIO_ADDR_1, OUTPUT) ;
-
-     digitalWrite (GPIO_LVLSFT_EN, 0) ;
-    }
     else
      write_MCP23017(IODIRA, 0x00);//Set Port A to outputs (CONTROL)
 
@@ -456,22 +625,12 @@ else//Set up
 
  wiringPiSetup () ;
  wiringPiSPISetup(0,10000000);
- //mcp23s17Setup (MCPBASE, 0, 0) ;
 
  if (USE_GPIO_CONTROL)
-  {
-   change_MCP23S17_dir(IODIRA, 1);
-
-   //wiringPiSetupGpio();
-   pinMode (GPIO_LVLSFT_EN, OUTPUT) ;
-   pinMode (GPIO_RD_PIN, OUTPUT) ;
-   pinMode (GPIO_WR_PIN, OUTPUT) ;
-   pinMode (GPIO_ADDR_0, OUTPUT) ;
-   pinMode (GPIO_ADDR_1, OUTPUT) ;
-
-  }
+  change_MCP23S17_dir(IODIRA, 1);
  else
   change_MCP23S17_dir(IODIRA, 0);
+ 
 
  changeDataPortDir(1);//Set Port B to Inputs
 

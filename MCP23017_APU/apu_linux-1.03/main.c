@@ -21,6 +21,7 @@
 #include <string.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <time.h>
 //#include "parport.h"
 #include "apuplay.h"
 #include "apu.h"

@@ -2,8 +2,8 @@
 CC=gcc
 LD=$(CC)
 
-CFLAGS=-g -lwiringPi -Wall -O2 -DVERSION_STR=\"1.02\" -DPROGRESS_SPINNER
-LDFLAGS= -lwiringPi
+CFLAGS=-g -lwiringPi -Wall -DVERSION_STR=\"1.02\" -DPROGRESS_SPINNER -O3
+LDFLAGS= -lwiringPi -O3
 
 PROG=apuplay
 OBJS = $(patsubst %.c,%.o,$(wildcard *.c))
