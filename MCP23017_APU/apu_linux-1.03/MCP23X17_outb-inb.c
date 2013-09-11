@@ -59,13 +59,22 @@
 #define ORIG_WR_PIN 0x04
 #define ORIG_RD_PIN 0x08
 
-#define GPIO_RD_PIN 4 //3
-#define GPIO_WR_PIN 5 //2
-#define GPIO_ADDR_0 6 //7
-#define GPIO_ADDR_1 10 //0
-#define GPIO_RESET  1 //5
-#define GPIO_LVLSFT_EN 11 //4
 
+#define GPIO_RD_PIN 4
+#define GPIO_WR_PIN 5
+#define GPIO_ADDR_0 6
+#define GPIO_ADDR_1 10
+#define GPIO_RESET  1
+#define GPIO_LVLSFT_EN 11
+
+/*
+#define GPIO_RD_PIN 3
+#define GPIO_WR_PIN 2
+#define GPIO_ADDR_0 7
+#define GPIO_ADDR_1 0
+#define GPIO_RESET  5
+#define GPIO_LVLSFT_EN 4
+*/
 
 #define GPIO_DATA_DIR  8
 
@@ -134,8 +143,7 @@ digitalWrite(GPIO_DATA_D4, bits[4]);
 digitalWrite(GPIO_DATA_D5, bits[5]);
 digitalWrite(GPIO_DATA_D6, bits[6]);
 digitalWrite(GPIO_DATA_D7, bits[7]);
-delayMicroseconds(5);
-//nSleep(100);
+delayMicroseconds(40);//50);
 }
 
 
@@ -146,7 +154,7 @@ delayMicroseconds(5);
 void write_GPIO_CONTROL(uint8_t data)
  {
   init_MCP23S17();
-  digitalWrite (GPIO_LVLSFT_EN,0);
+  //digitalWrite (GPIO_LVLSFT_EN,0);
 
   static int  previous_PA0_PIN   = -1;
   static int  previous_PA1_PIN   = -1;
@@ -197,7 +205,7 @@ void write_GPIO_CONTROL(uint8_t data)
     previous_RESET_PIN = current_RESET_PIN;
   }
 
-delayMicroseconds(5);
+delayMicroseconds(20);
  }
 
 
@@ -209,6 +217,8 @@ void write_MCP23017(int MCPregister, uint8_t data)
   fd = init_MCP23017(CHIPADDR);
   wiringPiI2CWriteReg8 (fd, MCPregister, (int)data);
  }
+
+
 
 void write_MCP23S17(int MCPregister, uint8_t data)
  {
@@ -222,6 +232,8 @@ void write_MCP23S17(int MCPregister, uint8_t data)
  }
 
 
+
+
 uint8_t read_MCP23017_data()
  {
   int fd = 0;
@@ -232,6 +244,8 @@ uint8_t read_MCP23017_data()
   data = (uint8_t)value;
   return data;
  }
+
+
 
 uint8_t read_MCP23S17_data()
  {
@@ -246,12 +260,13 @@ uint8_t read_MCP23S17_data()
   return spiData [2] ;
  }
 
+
+
 uint8_t read_gpio_data()
 {
 uint8_t data = 0;
 
-
-delayMicroseconds(5);
+//delayMicroseconds(10);
 
   if (digitalRead (GPIO_DATA_D7) )
    data = data| 0x80;
@@ -311,13 +326,14 @@ void change_GPIO_dir(int direction)
     pinMode(GPIO_DATA_D5, INPUT);
     pinMode(GPIO_DATA_D6, INPUT);
     pinMode(GPIO_DATA_D7, INPUT);
-
+    //delayMicroseconds(10);
     digitalWrite(GPIO_DATA_DIR,0);//A<B
     //usleep(2);
     }
   else if (direction == 0)
     {
     digitalWrite(GPIO_DATA_DIR,1);//A>B
+//    delayMicroseconds(20);
     pinMode(GPIO_DATA_D0, OUTPUT);
     pinMode(GPIO_DATA_D1, OUTPUT);
     pinMode(GPIO_DATA_D2, OUTPUT);
@@ -330,7 +346,7 @@ void change_GPIO_dir(int direction)
     }
 //nSleep(100);
 //usleep(1);
-delayMicroseconds(5);
+//delayMicroseconds(10);
 }
 
 
@@ -543,6 +559,10 @@ else
    if(USE_GPIO_CONTROL == 1)
     {
      //pinMode (GPIO_LVLSFT_EN, OUTPUT) ;
+
+    pinMode (GPIO_LVLSFT_EN, OUTPUT) ;
+    digitalWrite (GPIO_LVLSFT_EN, 0) ;
+
      pinMode (GPIO_RD_PIN, OUTPUT) ;
      pinMode (GPIO_WR_PIN, OUTPUT) ;
      pinMode (GPIO_ADDR_0, OUTPUT) ;
