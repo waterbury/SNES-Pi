@@ -2,6 +2,7 @@ import time
 import sys
 import os 
 import getopt
+import codecs
 from RPiMCP23S17.MCP23S17 import MCP23S17
 
 
@@ -378,7 +379,9 @@ currentAddr = headerAddr
 gotoOffset(headerAddr, isLowROM)
 
 for x in range(headerAddr, (headerAddr + 20) ):
- cartname += chr( readOffset(x,isLowROM) )
+ cartname +=  ( (chr( readOffset(x,isLowROM) )).decode('shift_jis')).encode('utf_8') #Read characters as Shift_JIS, and re-encode to utf_8
+ 
+cartname = cartname.rstrip() 
 
 ROMmakeup =  readAddr(headerAddr + 21,isLowROM)
 ROMspeed = getUpNibble(ROMmakeup)
