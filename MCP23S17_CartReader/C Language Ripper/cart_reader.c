@@ -33,6 +33,21 @@
 #define IOCON_B 0x0B
 #define GPPUB 0x0D
 
+/*
+# GPA0: /RD
+# GPA1: /RESET
+# GPA2: /WR
+# GPA3: /CS
+# GPA4: CART MOSFET
+# GPA7: /IRQ 
+*/	
+
+#define _RD    0b00000001
+#define _RESET 0b00000010
+#define _WR    0b00000100
+#define _CS    0b00001000
+#define _POWER 0b00010000
+
 int16_t currentBank = -1;
 uint32_t ROMchecksum = 0;
 uint32_t totalChecksum = 0;
@@ -57,6 +72,9 @@ int16_t getNumberOfPages(int16_t,int);
 const char * returnNULLheader(void);
 void CX4setROMsize(int16_t);
 void ripROM (uint8_t, int, int16_t, uint8_t *);
+void setIOControl(uint8_t );
+void initInterface(void);
+void shutdownInterface(void);
 
 
 
@@ -85,8 +103,7 @@ void writeByte (uint8_t spiPort, uint8_t devId, uint8_t reg, uint8_t data)
  *********************************************************************************
  */
 
-uint8_t readByte (uint8_t spiPort, uint8_t devId, uint8_t reg)
-{
+uint8_t readByte (uint8_t spiPort, uint8_t devId, uint8_t reg){
   uint8_t spiData [4] ;
 
   spiData [0] = CMD_READ | ((devId & 7) << 1) ;
@@ -97,43 +114,10 @@ uint8_t readByte (uint8_t spiPort, uint8_t devId, uint8_t reg)
   return spiData [2] ;
 }
 
-
-
-/* def readData():
- return SNESBankAndData._readRegister(GPIOB)
-*/
-
 uint8_t readData(void){
 	DataReads++;
 	return readByte (0, _SNESBankAndData, GPIOB); // SNESBankAndData._readRegister(GPIOB);
 }
- 
-/* def gotoAddr(addr,isLowROM):
- if addr <= 0xffff: 
-  upByte = int(addr/256)
-  lowByte = addr - (upByte * 256)
-  gotoAddr.currentAddr = addr
-  
-  if isLowROM != 0:
-   upByte = upByte | 0x80 # ORs a 1 to A15 if LoROM
-
-  if gotoAddr.currentUpByte != upByte:
-   SNESAddressPins._writeRegister(GPIOB,upByte)
-   gotoAddr.currentUpByte = upByte
-   
-  if gotoAddr.currentLowByte != lowByte: 
-   SNESAddressPins._writeRegister(GPIOA,lowByte)
-   gotoAddr.currentLowByte = lowByte  
-   
- else:
-  SNESAddressPins._writeRegister(GPIOA,0x00)
-  SNESAddressPins._writeRegister(GPIOB,0x00)
-  gotoAddr.currentAddr = 0
-
-gotoAddr.currentAddr = -1
-gotoAddr.currentUpByte = -1
-gotoAddr.currentLowByte = -1
-*/
 
 void gotoAddr(int32_t addr, int isLowROM){
 	static int32_t currentAddr = -1;
@@ -174,15 +158,6 @@ void gotoAddr(int32_t addr, int isLowROM){
 	
 }
 
-/* def gotoBank(bank):
-
- if bank != gotoBank.currentBank:
-  SNESBankAndData._writeRegister(GPIOA,bank)
-  gotoBank.currentBank = bank
-  
-gotoBank.currentBank = -1
-*/
-
 void gotoBank(int16_t bank){
 	//static int16_t currentBank = -1;
 	
@@ -194,21 +169,10 @@ void gotoBank(int16_t bank){
 	
 }
 
-/* def readAddr(addr,isLowROM):
- gotoAddr(addr,isLowROM) 
- return readData()
-*/
-
 uint8_t readAddr(int32_t addr, int isLowROM){
 	gotoAddr(addr,isLowROM); 
 	return readData();	
 }
- 
-/* def readAddrBank(addr,bank):
- gotoBank(bank) 
- gotoAddr(addr,0)
- return readData()
-*/
 
 uint8_t readAddrBank(int32_t addr, uint8_t bank){
 	gotoBank(bank); 
@@ -216,24 +180,6 @@ uint8_t readAddrBank(int32_t addr, uint8_t bank){
 	return readData();
 }
  
-/* def gotoOffset(offset,isLowROM):
-
- if isLowROM == 0:
-  bank = int( offset / 65536) #64Kilobyte pages
-  addr = offset - (bank * 65536) #64kilobyte pages
-
- else:
-  bank = int( offset / 32768)#32kilobyte pages
-  addr = offset - (bank * 32768)#32kilobyte pages
-
- gotoBank(bank)
- gotoAddr(addr,isLowROM)
-  
- gotoOffset.currentOffset = offset
- 
-gotoOffset.currentOffset = 0
-*/
-
 void gotoOffset(uint32_t offset,int isLowROM){
 	//static uint32_t currentOffset = 0;
 	//	printf("Forth\n");
@@ -256,38 +202,11 @@ void gotoOffset(uint32_t offset,int isLowROM){
 	//currentOffset = offset;
 }
 
-/* def readOffset(offset,isLowROM):
- gotoOffset(offset,isLowROM)
- return readData()
-*/
-
 uint8_t readOffset(uint32_t offset,int isLowROM){
 	//printf("Seventh\n");
 	gotoOffset(offset,isLowROM);
 	return readData();
 }
- 
-/* def compareROMchecksums(header,isLowROM):
- if isLowROM == 1:
-  IOControls._writeRegister(GPIOA,0x06)#reset
-
- currentOffset = header + 28
- inverseChecksum  = readOffset(currentOffset,isLowROM)
- inverseChecksum += readOffset(currentOffset+1,isLowROM) * 256
- print "Inverse Checksum: " + str( hex(inverseChecksum) )
-
- currentOffset = header + 30
-
- ROMchecksum  = readOffset(currentOffset,isLowROM)
- ROMchecksum += readOffset(currentOffset+1,isLowROM) * 256
- print "Checksum: " + str(hex(ROMchecksum) )
-
-
- if (inverseChecksum ^ ROMchecksum) == 0xFFFF:
-  return 1
- else:
-  return 0
- */
  
 int compareROMchecksums(header,isLowROM){
 	uint32_t currentOffset;
@@ -332,16 +251,6 @@ int power(int base, unsigned int exp) {
     return result;
  }
 
-/* def getROMsize(offset, isLowROM):
- ROMsizeRegister = readOffset(offset,isLowROM)
- ROMsizeRegister -= 7
-
- if ROMsizeRegister >=0:
-  return  pow(2, ROMsizeRegister)
- else:
-  return -1
-*/  
-
 int16_t getROMsize(uint32_t offset, int isLowROM){
 	uint8_t ROMsizeRegister = readOffset(offset,isLowROM);
 	ROMsizeRegister -= 7;
@@ -352,14 +261,6 @@ int16_t getROMsize(uint32_t offset, int isLowROM){
 		return -1;
 }
 
-/* def getNumberOfPages(actualROMsize,isLowROM):
- actualROMsize *= 2
- if isLowROM == 1:
-  actualROMsize *= 2
-
- return actualROMsize
-*/
-
 int16_t getNumberOfPages(int16_t actualROMsize,int isLowROM){
 	actualROMsize *= 2;
 	if (isLowROM == 1)
@@ -367,50 +268,11 @@ int16_t getNumberOfPages(int16_t actualROMsize,int isLowROM){
 	
 	return actualROMsize;
 	}
- 
-/* def returnNULLheader():
- charStr = ""
- for x in range(0, 512):
-  charStr += chr(0x00)
- return charStr
-*/
 
 const char * returnNULLheader(void){
  static char charStr[512] = "";
  return charStr;
 }
-
-/* def CX4setROMsize(ROMsize):
- gotoOffset(0x007F52,0)
- ROMsizeRegister = readData()
- print "$007F52 offset reads    " + str( ROMsizeRegister )
- SNESBankAndData._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
- IOControls._writeRegister(GPIOA,0x03)#reset + /RD high
- # GPA0: /RD
- # GPA1: /RESET
- # GPA2: /WR
- # GPA3: /CS
- # GPA4: CART MOSFET
- # GPA7: /IRQ
-
- if ROMsize > 8:
-  if ROMsizeRegister == 1:
-   print "ROM is larger than 8 megs, writing 0x00 to CX4 register"
-   SNESBankAndData._writeRegister(GPIOB,0x00)
-  else:
-   print "CX4 register is at correct value, will not change"
-
- else:
-  if ROMsizeRegister == 1:  
-   print "CX4 register is at correct value, will not change"
-  else:
-   print "ROM is 8 megs, writing 0x01 to CX4 register"
-   SNESBankAndData._writeRegister(GPIOB,0x01)
-
- IOControls._writeRegister(GPIOA,0x06)#reset + /WR high
- SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to back to inputs  (SNES Data 0-7)
- print "$007F52 offset now reads " + str( readData() )
-*/
 
 void CX4setROMsize(int16_t ROMsize){
 	gotoOffset(0x007F52,0);
@@ -451,49 +313,6 @@ void CX4setROMsize(int16_t ROMsize){
 	writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to back to inputs  (SNES Data 0-7)
 	printf("$007F52 offset now reads %u",readData() );
 }
- 
-/* def ripROM (startBank, isLowROM,numberOfPages):
-  #cart.write_byte_data(_IOControls,GPIOA,0x04)
- ROMdump = ""
- pageChecksum = 0
- currentByte = 0
- bank = 0
- 
- if isLowROM == 1:
-  startOffset = startBank * 0x8000
- else:
-  startOffset = startBank * 0x10000
- 
- offset = startOffset  # Set current Offset to starting offset
- gotoOffset(startOffset,isLowROM)# Change current bank & address to offset
-
- print "----Start Cart Read------" 
- print ""
- #Start at current bank, and increment the number of banks needed
- for bank in range(startBank, (numberOfPages + startBank)  ): 
-  print "Current Bank:  DEC: " + str( gotoBank.currentBank ) + "; HEX: " + str( hex(gotoBank.currentBank ))
-  
-  #If bank increments, exit the following inner loop, else keep scanning
-  while bank == gotoBank.currentBank:
-   currentByte = readData()
-   ROMdump += chr(currentByte)
-   pageChecksum += currentByte 
-   offset += 1 #Increment offset
-   gotoOffset(offset,isLowROM) #goto new offset
- 
-  if isLowROM == 0 or (isLowROM == 1 and gotoBank.currentBank % 2 == 0):
-   print " - Page Checksum:       " + str( pageChecksum ) 
-   ripROM.totalChecksum += pageChecksum
-   pageChecksum = 0
-   print ""
-   print "Current Checksum:      " + str( ripROM.totalChecksum ) + " | Hex: " + str( hex( ripROM.totalChecksum ) )
-   print "Header Checksum:       " + str(hex(ROMchecksum))
-   print ""
-  
- return ROMdump
- 
-ripROM.totalChecksum = 0
-*/
 
 void ripROM (uint8_t startBank, int isLowROM, int16_t numberOfPages, uint8_t *ROMdump){
 	totalChecksum = 0;
@@ -591,34 +410,62 @@ void ripROM (uint8_t startBank, int isLowROM, int16_t numberOfPages, uint8_t *RO
  return SRAMdump
 */ 
 
-/* int main (void)
-{
-  int i, bit ;
+void setIOControl(uint8_t IOControls){
+/*
+# GPA0: /RD
+# GPA1: /RESET
+# GPA2: /WR
+# GPA3: /CS
+# GPA4: CART MOSFET
+# GPA7: /IRQ 
+*/	
+//Inverses Power
+IOControls = IOControls ^ _POWER;
 
-  wiringPiSetup () ;
-  mcp23s17Setup (BASE, 0, 0) ;
+	writeByte (0, _IOControls, GPIOA, IOControls);
+	
+}
 
-  printf ("Raspberry Pi - MCP23S17 Test\n") ;
+void initInterface(void){
+	
+	writeByte (0, _IOControls, IOCON_B, 0x08);//IOControls._writeRegister(IOCON_B,0x08)
 
-  for (i = 0 ; i < 10 ; ++i)
-    pinMode (BASE + i, OUTPUT) ;
+	writeByte (0, _SNESAddressPins, IODIRA, 0x00);//SNESAddressPins._writeRegister(IODIRA,0x00) # Set MCP bank A to outputs (SNES Addr 0-7)
+	writeByte (0, _SNESAddressPins, IODIRB, 0x00);//SNESAddressPins._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs (SNES Addr 8-15)
 
-  pinMode         (BASE + 15, INPUT) ;
-  pullUpDnControl (BASE + 15, PUD_UP) ;
+	writeByte (0, _SNESBankAndData, IODIRA, 0x00);//SNESBankAndData._writeRegister(IODIRA,0x00) # Set MCP bank A to outputs (SNES Bank 0-7)
+	writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
 
-  for (;;)
-  {
-    for (i = 0 ; i < 1024 ; ++i)
-    {
-      for (bit = 0 ; bit < 10 ; ++bit)
-        digitalWrite (BASE + bit, i & (1 << bit)) ;
-      delay (5) ;
-      while (digitalRead (BASE + 15) == 0)
-        delay (1) ;
-    }
-  }
-  return 0 ;
-}*/
+	writeByte (0, _SNESBankAndData, GPPUB, 0xFF);//SNESBankAndData._writeRegister(GPPUB,0xFF) # Enables Pull-Up Resistors on MCP SNES Data 0-7		
+	
+	writeByte (0, _IOControls, IODIRA, 0x80);//IOControls._writeRegister(IODIRA,0x80) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
+	writeByte (0, _IOControls, IODIRB, 0x00);//IOControls._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs 
+
+}
+
+void shutdownInterface(void){
+	
+	gotoAddr(00,0);
+	gotoBank(00);
+
+	writeByte (0, _SNESBankAndData, GPPUB, 0x00);//SNESBankAndData._writeRegister(GPPUB,0x00) # Disables Pull-Up Resistors on MCP SNES Data 0-7
+	writeByte (0, _SNESBankAndData, DEFVALB, 0xFF);//SNESBankAndData._writeRegister(DEFVALB,0xFF) # Expect MCP SNES Data 0-7 to default to 0xFF
+	writeByte (0, _SNESBankAndData, GPINTENB, 0x00);//SNESBankAndData._writeRegister(GPINTENB,0x00) # Sets up all of SNES Data 0-7 to be interrupt disabled
+
+	writeByte (0, _SNESAddressPins, IODIRA, 0xFF);//SNESAddressPins._writeRegister(IODIRA,0xFF) # Set MCP bank A to outputs (SNES Addr 0-7)
+	writeByte (0, _SNESAddressPins, IODIRB, 0xFF);//SNESAddressPins._writeRegister(IODIRB,0xFF) # Set MCP bank B to outputs (SNES Addr 8-15)
+
+	writeByte (0, _SNESBankAndData, IODIRA, 0xFF);//SNESBankAndData._writeRegister(IODIRA,0xFF) # Set MCP bank A to outputs (SNES Bank 0-7)
+	writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs (SNES Data 0-7)
+
+	writeByte (0, _IOControls, IODIRA, 0xEF);//IOControls._writeRegister(IODIRA,0xEF) # Set MCP bank A to inputs; WITH EXCEPTION TO MOSFET
+
+	setIOControl(0); //writeByte (0, _IOControls, GPIOA, 0x10);//IOControls._writeRegister(GPIOA,0x10) #Turn off MOSFET	
+	
+}
+
+
+
 
 int main(void){
 	
@@ -642,40 +489,16 @@ int main(void){
 	int x = 0;
 	// ------------- Set Registers -----------------------------------------------------
 
-//IOControls      = MCP23S17(bus=0x00, ce=0x00, deviceID=0x03)
-//SNESAddressPins = MCP23S17(bus=0x00, ce=0x00, deviceID=0x00)
-//SNESBankAndData = MCP23S17(bus=0x00, ce=0x00, deviceID=0x02)
 
-//IOControls.open()
-//SNESAddressPins.open()
-//SNESBankAndData.open()
 	wiringPiSetup () ;
 	mcp23s17Setup (BASE, 0, _IOControls) ;
 	mcp23s17Setup (BASE+100, 0,_SNESAddressPins) ;
 	mcp23s17Setup (BASE+200, 0, _SNESBankAndData) ;
 
-writeByte (0, _IOControls, IOCON_B, 0x08);//IOControls._writeRegister(IOCON_B,0x08)
+	initInterface();
 
 
-writeByte (0, _SNESAddressPins, IODIRA, 0x00);//SNESAddressPins._writeRegister(IODIRA,0x00) # Set MCP bank A to outputs (SNES Addr 0-7)
-writeByte (0, _SNESAddressPins, IODIRB, 0x00);//SNESAddressPins._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs (SNES Addr 8-15)
-
-writeByte (0, _SNESBankAndData, IODIRA, 0x00);//SNESBankAndData._writeRegister(IODIRA,0x00) # Set MCP bank A to outputs (SNES Bank 0-7)
-writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
-
-writeByte (0, _SNESBankAndData, GPPUB, 0xFF);//SNESBankAndData._writeRegister(GPPUB,0xFF) # Enables Pull-Up Resistors on MCP SNES Data 0-7
-//#SNESBankAndData._writeRegister(DEFVALB,0xFF) # Expect MCP SNES Data 0-7 to default to 0xFF
-//#cart.write_byte_data(_SNESBankAndData,GPINTENB,0xFF) # Sets up all of SNES Data 0-7 to be interrupt enabled
-//#SNESBankAndData._writeRegister(GPINTENB,0x89) # Sets up some of SNES Data 0-7 to be interrupt enabled
-
-//#cart.write_byte_data(_SNESBankAndData,INTCONB,0x00) # compares interrupts to previous SNES Data 0-7
-//#SNESBankAndData._writeRegister(INTCONB,0xFF) # compares interrupts to DEFVALB
-                       
-
-//printf("second\n");
-
-writeByte (0, _IOControls, IODIRA, 0x80);//IOControls._writeRegister(IODIRA,0x80) # Set MCP bank A to outputs; WITH EXCEPTION TO IRQ
-
+//----------------------------------------------------------------------------------------------------
 /*
 # GPA0: /RD
 # GPA1: /RESET
@@ -683,12 +506,9 @@ writeByte (0, _IOControls, IODIRA, 0x80);//IOControls._writeRegister(IODIRA,0x80
 # GPA3: /CS
 # GPA4: CART MOSFET
 # GPA7: /IRQ 
-*/
+*/	
 
-writeByte (0, _IOControls, IODIRB, 0x00);//IOControls._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs 
-
-//----------------------------------------------------------------------------------------------------
-writeByte (0, _IOControls, GPIOA, 0x06);//IOControls._writeRegister(GPIOA,0x06)#reset
+setIOControl(_RESET + _WR + _POWER);   //writeByte (0, _IOControls, GPIOA, 0x06);//IOControls._writeRegister(GPIOA,0x06)#reset
 //time.sleep(.25)
 
 //-----------------------------------------------------
@@ -898,10 +718,7 @@ if (isValid == 1){
   printf("\nIt took %d seconds to read cart\n", timeEnd - timeStart);
   printf("Size of Cart in Bytes: %d\n", sizeOfCartInBytes);
 
-
-  //f.write(dump)
   fwrite(dump, sizeof(uint8_t), sizeOfCartInBytes, romfile); 
-  //f.close
   fclose(romfile);
   free(dump);
  }
@@ -925,28 +742,8 @@ else{
 
 
 //#--- Clean Up & End Script ------------------------------------------------------
-gotoAddr(00,0);
-gotoBank(00);
 
-writeByte (0, _SNESBankAndData, GPPUB, 0x00);//SNESBankAndData._writeRegister(GPPUB,0x00) # Disables Pull-Up Resistors on MCP SNES Data 0-7
-writeByte (0, _SNESBankAndData, DEFVALB, 0xFF);//SNESBankAndData._writeRegister(DEFVALB,0xFF) # Expect MCP SNES Data 0-7 to default to 0xFF
-writeByte (0, _SNESBankAndData, GPINTENB, 0x00);//SNESBankAndData._writeRegister(GPINTENB,0x00) # Sets up all of SNES Data 0-7 to be interrupt disabled
-
-writeByte (0, _SNESAddressPins, IODIRA, 0xFF);//SNESAddressPins._writeRegister(IODIRA,0xFF) # Set MCP bank A to outputs (SNES Addr 0-7)
-writeByte (0, _SNESAddressPins, IODIRB, 0xFF);//SNESAddressPins._writeRegister(IODIRB,0xFF) # Set MCP bank B to outputs (SNES Addr 8-15)
-
-writeByte (0, _SNESBankAndData, IODIRA, 0xFF);//SNESBankAndData._writeRegister(IODIRA,0xFF) # Set MCP bank A to outputs (SNES Bank 0-7)
-writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs (SNES Data 0-7)
+shutdownInterface();
 
 
-
-
-writeByte (0, _IOControls, IODIRA, 0xEF);//IOControls._writeRegister(IODIRA,0xEF) # Set MCP bank A to inputs; WITH EXCEPTION TO MOSFET
-
-writeByte (0, _IOControls, GPIOA, 0x10);//IOControls._writeRegister(GPIOA,0x10) #Turn off MOSFET
-
-
-//SNESAddressPins.close()
-//SNESBankAndData.close()
-//IOControls.close()
 }
