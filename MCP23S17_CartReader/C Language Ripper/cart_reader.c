@@ -19,6 +19,38 @@
 #define BASE    123
 // ------------ Setup Register Definitions ------------------------------------------
 
+#define GPIO_OUT_0 4
+#define GPIO_OUT_1 3
+#define GPIO_OUT_2 2
+#define GPIO_OUT_3 1
+#define GPIO_OUT_4 0
+#define GPIO_OUT_5 7
+#define GPIO_OUT_6 9
+#define GPIO_OUT_7 8
+
+#define GPIO_DATA_DIR 14
+#define GPIO_DATA_0 29
+#define GPIO_DATA_1 28
+#define GPIO_DATA_2 25
+#define GPIO_DATA_3 27
+#define GPIO_DATA_4 26
+#define GPIO_DATA_5 11
+#define GPIO_DATA_6 6
+#define GPIO_DATA_7 5
+
+
+#define GPIO_TRIG_DATA_OUT 12
+#define GPIO_OE_DATA_OUT 13
+
+#define GPIO_TRIG_HIGH_ADDR 21
+#define GPIO_TRIG_LOW_ADDR 22
+#define GPIO_TRIG_BANK 23
+#define GPIO_TRIG_CTRL 19
+
+#define GPIO_OE_CTRL 10
+
+
+
 #define _SNESAddressPins 0x20 // MCP23017 Chip with SNES Address Pins
 #define _SNESBankAndData 0x22 // MCP23017 Chip with SNES Bank and Data
 #define _IOControls 0x23        // MCP23017 Chip to control SNES IO Controls including MOSFET Power
@@ -55,6 +87,7 @@ uint32_t LowByteWrites = 0;
 uint32_t HighByteWrites = 0;
 uint32_t BankWrites = 0;
 uint32_t DataReads = 0;
+int useSPI = 1;
 
 
 uint8_t readData(void);
@@ -73,8 +106,9 @@ const char * returnNULLheader(void);
 void CX4setROMsize(int16_t);
 void ripROM (uint8_t, int, int16_t, uint8_t *);
 void setIOControl(uint8_t );
-void initInterface(void);
-void shutdownInterface(void);
+void initInterface_SPI(void);
+void shutdownInterface_SPI(void);
+void writeFlipflops(uint8_t,int);
 
 
 
@@ -116,7 +150,16 @@ uint8_t readByte (uint8_t spiPort, uint8_t devId, uint8_t reg){
 
 uint8_t readData(void){
 	DataReads++;
-	return readByte (0, _SNESBankAndData, GPIOB); // SNESBankAndData._readRegister(GPIOB);
+	
+	if (useSPI == 1){
+		return readByte (0, _SNESBankAndData, GPIOB); // SNESBankAndData._readRegister(GPIOB);
+	}
+	//use GPIO
+	else{
+				
+				//TO DO -------------------------------------------------------------------------------------------------------
+		return 0;		
+	}
 }
 
 void gotoAddr(int32_t addr, int isLowROM){
@@ -137,21 +180,51 @@ void gotoAddr(int32_t addr, int isLowROM){
 		}
 
 		if (currentUpByte != upByte){
-			writeByte (0, _SNESAddressPins, GPIOB, upByte); //SNESAddressPins._writeRegister(GPIOB,upByte);
+			
+			if (useSPI == 1){
+				writeByte (0, _SNESAddressPins, GPIOB, upByte); //SNESAddressPins._writeRegister(GPIOB,upByte);			
+			}
+			//use GPIO
+			else{
+				
+				writeFlipflops(upByte, GPIO_TRIG_HIGH_ADDR);
+				
+			}
+			
 			currentUpByte = upByte;
 			HighByteWrites++;
 		}
    
 		if (currentLowByte != lowByte){
-			writeByte (0, _SNESAddressPins, GPIOA, lowByte);//SNESAddressPins._writeRegister(GPIOA,lowByte)
+			if (useSPI ==1){
+				writeByte (0, _SNESAddressPins, GPIOA, lowByte);//SNESAddressPins._writeRegister(GPIOA,lowByte)
+			}
+			//use GPIO
+			else{
+				
+				writeFlipflops(lowByte, GPIO_TRIG_LOW_ADDR);
+				
+			}
+			
 			currentLowByte = lowByte;  
 			LowByteWrites++;
 		}
 	}
 	
 	else{
-		writeByte (0, _SNESAddressPins, GPIOA, 0x00);//SNESAddressPins._writeRegister(GPIOA,0x00)
-		writeByte (0, _SNESAddressPins, GPIOB, 0x00);//SNESAddressPins._writeRegister(GPIOB,0x00)
+		
+		if (useSPI == 1){
+			writeByte (0, _SNESAddressPins, GPIOA, 0x00);//SNESAddressPins._writeRegister(GPIOA,0x00)
+			writeByte (0, _SNESAddressPins, GPIOB, 0x00);//SNESAddressPins._writeRegister(GPIOB,0x00)		
+		}
+		//use GPIO
+		else{
+				
+				writeFlipflops(0x00, GPIO_TRIG_LOW_ADDR);
+				writeFlipflops(0x00, GPIO_TRIG_HIGH_ADDR);
+				
+		}
+		
 		currentAddr = 0;
  }
 		
@@ -162,7 +235,16 @@ void gotoBank(int16_t bank){
 	//static int16_t currentBank = -1;
 	
 	if (bank != currentBank){
-		writeByte (0, _SNESBankAndData, GPIOA, bank);//SNESBankAndData._writeRegister(GPIOA,bank)
+		
+		if (useSPI == 1){
+			writeByte (0, _SNESBankAndData, GPIOA, bank);//SNESBankAndData._writeRegister(GPIOA,bank)
+		}
+		//use GPIO
+		else{
+				
+				writeFlipflops(bank, GPIO_TRIG_BANK);
+			
+		}
 		currentBank = bank;
 		BankWrites++;
 	}
@@ -422,11 +504,21 @@ void setIOControl(uint8_t IOControls){
 //Inverses Power
 IOControls = IOControls ^ _POWER;
 
+if (useSPI == 1){
 	writeByte (0, _IOControls, GPIOA, IOControls);
+}
+//else use direct GPIO
+else{
+				
+				//TO DO -------------------------------------------------------------------------------------------------------
+				
+}
 	
 }
 
-void initInterface(void){
+void initInterface_SPI(void){
+	
+	useSPI = 1;
 	
 	writeByte (0, _IOControls, IOCON_B, 0x08);//IOControls._writeRegister(IOCON_B,0x08)
 
@@ -443,7 +535,51 @@ void initInterface(void){
 
 }
 
-void shutdownInterface(void){
+void initInterface_GPIO(void){
+	useSPI = 0;
+	
+	pinMode(GPIO_DATA_DIR, OUTPUT);
+	digitalWrite(GPIO_DATA_DIR, 0);//set up DATA pins as inputs
+	
+	pinMode(GPIO_DATA_0, INPUT);
+	pinMode(GPIO_DATA_1, INPUT);
+	pinMode(GPIO_DATA_2, INPUT);
+	pinMode(GPIO_DATA_3, INPUT);
+	pinMode(GPIO_DATA_4, INPUT);
+	pinMode(GPIO_DATA_5, INPUT);
+	pinMode(GPIO_DATA_6, INPUT);
+	pinMode(GPIO_DATA_7, INPUT);
+	
+	pinMode(GPIO_OUT_0, OUTPUT);
+    pinMode(GPIO_OUT_1, OUTPUT);
+    pinMode(GPIO_OUT_2, OUTPUT);
+    pinMode(GPIO_OUT_3, OUTPUT);
+    pinMode(GPIO_OUT_4, OUTPUT);
+    pinMode(GPIO_OUT_5, OUTPUT);
+    pinMode(GPIO_OUT_6, OUTPUT);
+    pinMode(GPIO_OUT_7, OUTPUT);
+	
+	pinMode(GPIO_TRIG_BANK, OUTPUT);
+    pinMode(GPIO_TRIG_CTRL, OUTPUT);
+    pinMode(GPIO_TRIG_DATA_OUT, OUTPUT);
+    pinMode(GPIO_TRIG_HIGH_ADDR, OUTPUT);
+    pinMode(GPIO_TRIG_LOW_ADDR, OUTPUT);
+	
+	digitalWrite(GPIO_TRIG_BANK, 0);
+	digitalWrite(GPIO_TRIG_CTRL, 0);
+	digitalWrite(GPIO_TRIG_DATA_OUT, 0);
+	digitalWrite(GPIO_TRIG_HIGH_ADDR, 0);
+	digitalWrite(GPIO_TRIG_LOW_ADDR, 0);	
+	
+	pinMode(GPIO_OE_CTRL, OUTPUT);
+	digitalWrite(GPIO_OE_CTRL, 0);
+	
+	pinMode(GPIO_OE_DATA_OUT, OUTPUT);
+	digitalWrite(GPIO_OE_DATA_OUT, 1);
+	
+}
+
+void shutdownInterface_SPI(void){
 	
 	gotoAddr(00,0);
 	gotoBank(00);
@@ -461,6 +597,36 @@ void shutdownInterface(void){
 	writeByte (0, _IOControls, IODIRA, 0xEF);//IOControls._writeRegister(IODIRA,0xEF) # Set MCP bank A to inputs; WITH EXCEPTION TO MOSFET
 
 	setIOControl(0); //writeByte (0, _IOControls, GPIOA, 0x10);//IOControls._writeRegister(GPIOA,0x10) #Turn off MOSFET	
+	
+}
+
+void shutdownInterface_GPIO(void){
+	digitalWrite(GPIO_OE_CTRL, 1);//Turn Off Flip flops
+	digitalWrite(GPIO_OE_DATA_OUT, 1);
+}
+
+void writeFlipflops(uint8_t dataOut,int clkTrigger){
+	
+int i = 0;
+int bits[8] = {0};
+
+for (i=0;i<8;i++)
+ if( (dataOut & (1<<i) ) == (1<<i) )
+   bits[i] = 1;   
+
+digitalWrite(GPIO_OUT_0, bits[0]); 
+digitalWrite(GPIO_OUT_1, bits[1]);
+digitalWrite(GPIO_OUT_2, bits[2]);
+digitalWrite(GPIO_OUT_3, bits[3]);
+digitalWrite(GPIO_OUT_4, bits[4]);
+digitalWrite(GPIO_OUT_5, bits[5]);
+digitalWrite(GPIO_OUT_6, bits[6]);
+digitalWrite(GPIO_OUT_7, bits[7]);
+	
+digitalWrite(clkTrigger, 1);
+for (i=0;i<8;i++);
+digitalWrite(clkTrigger, 0);
+	
 	
 }
 
@@ -495,7 +661,7 @@ int main(void){
 	mcp23s17Setup (BASE+100, 0,_SNESAddressPins) ;
 	mcp23s17Setup (BASE+200, 0, _SNESBankAndData) ;
 
-	initInterface();
+	initInterface_SPI();
 
 
 //----------------------------------------------------------------------------------------------------
@@ -743,7 +909,7 @@ else{
 
 //#--- Clean Up & End Script ------------------------------------------------------
 
-shutdownInterface();
+shutdownInterface_SPI();
 
 
 }
