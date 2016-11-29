@@ -380,7 +380,7 @@ void CX4setROMsize(int16_t ROMsize){
 	uint8_t ROMsizeRegister = readData();
 	printf("$007F52 offset reads    %u", ROMsizeRegister );
 	changeDataDir(0);//writeByte (0, _SNESBankAndData, IODIRB, 0x00);//SNESBankAndData._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
-	setIOControl(_RESET + _RD + _POWER); //writeByte (0, _IOControls, GPIOA, 0x03);//IOControls._writeRegister(GPIOA,0x03)#reset + /RD high
+	setIOControl(_WR + _CS + _POWER);
 	
 	/*
 	# GPA0: /RD
@@ -410,8 +410,8 @@ void CX4setROMsize(int16_t ROMsize){
 		}
 	}
  
-	setIOControl(_RESET + _WR + _POWER);//writeByte (0, _IOControls, GPIOA, 0x06);//IOControls._writeRegister(GPIOA,0x06)#reset + /WR high
-	changeDataDir(1);//writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to back to inputs  (SNES Data 0-7)
+	setIOControl(_RD + _CS + _POWER); 
+	changeDataDir(1);
 	printf("$007F52 offset now reads %u",readData() );
 }
 
@@ -473,16 +473,27 @@ void changeDataDir(int direction){
 	
 		if (direction == 1){
 			writeByte (0, _SNESBankAndData, IODIRB, 0xFF);
+			currentDataDir = 1;
 		}
 		
 		else{		
 			writeByte (0, _SNESBankAndData, IODIRB, 0x00);//SNESBankAndData._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
+			currentDataDir = 0;
 		}
 		
 	}
 	else{
 		
 		//TO DO -------------------------------------------------------------------------------------------------------
+		if (direction == 1){
+			currentDataDir = 1;
+			
+		}
+		
+		else{		
+			
+			currentDataDir = 0;
+		}
 		
 	}
 	
@@ -541,10 +552,12 @@ void setIOControl(uint8_t IOControls){
 # GPA7: /IRQ 
 */	
 
+//Inverses Control Bits. Bits are pulled low to enable
+IOControls ^ 0x0F; 
 
 if (useSPI == 1){
 	
-	//Inverses Power
+	//Inverses Power (pull mosfet low to enable)
 	IOControls = IOControls ^ _POWER;
 	writeByte (0, _IOControls, GPIOA, IOControls);
 }
@@ -714,7 +727,7 @@ int main(void){
 # GPA7: /IRQ 
 */	
 
-setIOControl(_RESET + _WR + _POWER);   //writeByte (0, _IOControls, GPIOA, 0x06);//IOControls._writeRegister(GPIOA,0x06)#reset
+setIOControl(_RD + _CS + _POWER); 
 //time.sleep(.25)
 
 //-----------------------------------------------------
