@@ -88,6 +88,7 @@ uint32_t HighByteWrites = 0;
 uint32_t BankWrites = 0;
 uint32_t DataReads = 0;
 int useSPI = 1;
+int currentDataDir = 1;
 
 
 uint8_t readData(void);
@@ -109,6 +110,7 @@ void setIOControl(uint8_t );
 void initInterface_SPI(void);
 void shutdownInterface_SPI(void);
 void writeFlipflops(uint8_t,int);
+void changeDataDir(int direction);
 
 
 
@@ -150,15 +152,32 @@ uint8_t readByte (uint8_t spiPort, uint8_t devId, uint8_t reg){
 
 uint8_t readData(void){
 	DataReads++;
+	uint8_t data = 0;
 	
 	if (useSPI == 1){
 		return readByte (0, _SNESBankAndData, GPIOB); // SNESBankAndData._readRegister(GPIOB);
 	}
 	//use GPIO
 	else{
-				
-				//TO DO -------------------------------------------------------------------------------------------------------
-		return 0;		
+		
+		if (digitalRead (GPIO_DATA_7) )
+			data = data| 0x80;
+		if (digitalRead (GPIO_DATA_6) )
+			data = data| 0x40;
+		if (digitalRead (GPIO_DATA_5) )
+			data = data| 0x20;
+		if (digitalRead (GPIO_DATA_4) )
+			data = data| 0x10;
+		if (digitalRead (GPIO_DATA_3) )
+			data = data| 0x08;
+		if (digitalRead (GPIO_DATA_2) )
+			data = data| 0x04;
+		if (digitalRead (GPIO_DATA_1) )
+			data = data| 0x02;
+		if (digitalRead (GPIO_DATA_0) )
+			data = data| 0x01;
+
+		return data;		
 	}
 }
 
@@ -360,8 +379,8 @@ void CX4setROMsize(int16_t ROMsize){
 	gotoOffset(0x007F52,0);
 	uint8_t ROMsizeRegister = readData();
 	printf("$007F52 offset reads    %u", ROMsizeRegister );
-	writeByte (0, _SNESBankAndData, IODIRB, 0x00);//SNESBankAndData._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
-	writeByte (0, _IOControls, GPIOA, 0x03);//IOControls._writeRegister(GPIOA,0x03)#reset + /RD high
+	changeDataDir(0);//writeByte (0, _SNESBankAndData, IODIRB, 0x00);//SNESBankAndData._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
+	setIOControl(_RESET + _RD + _POWER); //writeByte (0, _IOControls, GPIOA, 0x03);//IOControls._writeRegister(GPIOA,0x03)#reset + /RD high
 	
 	/*
 	# GPA0: /RD
@@ -391,8 +410,8 @@ void CX4setROMsize(int16_t ROMsize){
 		}
 	}
  
-	writeByte (0, _IOControls, GPIOA, 0x06);//IOControls._writeRegister(GPIOA,0x06)#reset + /WR high
-	writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to back to inputs  (SNES Data 0-7)
+	setIOControl(_RESET + _WR + _POWER);//writeByte (0, _IOControls, GPIOA, 0x06);//IOControls._writeRegister(GPIOA,0x06)#reset + /WR high
+	changeDataDir(1);//writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to back to inputs  (SNES Data 0-7)
 	printf("$007F52 offset now reads %u",readData() );
 }
 
@@ -449,6 +468,26 @@ void ripROM (uint8_t startBank, int isLowROM, int16_t numberOfPages, uint8_t *RO
  
 }
 
+void changeDataDir(int direction){
+	if (useSPI == 1){
+	
+		if (direction == 1){
+			writeByte (0, _SNESBankAndData, IODIRB, 0xFF);
+		}
+		
+		else{		
+			writeByte (0, _SNESBankAndData, IODIRB, 0x00);//SNESBankAndData._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs  (SNES Data 0-7)
+		}
+		
+	}
+	else{
+		
+		//TO DO -------------------------------------------------------------------------------------------------------
+		
+	}
+	
+	
+}
 /* def ripSRAM(SRAMsize, ROMsize, isLowROM):
  SRAMdump = ""
  pageChecksum = 0
@@ -501,16 +540,18 @@ void setIOControl(uint8_t IOControls){
 # GPA4: CART MOSFET
 # GPA7: /IRQ 
 */	
-//Inverses Power
-IOControls = IOControls ^ _POWER;
+
 
 if (useSPI == 1){
+	
+	//Inverses Power
+	IOControls = IOControls ^ _POWER;
 	writeByte (0, _IOControls, GPIOA, IOControls);
 }
 //else use direct GPIO
 else{
 				
-				//TO DO -------------------------------------------------------------------------------------------------------
+	writeFlipflops(IOControls, GPIO_TRIG_CTRL);
 				
 }
 	
@@ -526,7 +567,7 @@ void initInterface_SPI(void){
 	writeByte (0, _SNESAddressPins, IODIRB, 0x00);//SNESAddressPins._writeRegister(IODIRB,0x00) # Set MCP bank B to outputs (SNES Addr 8-15)
 
 	writeByte (0, _SNESBankAndData, IODIRA, 0x00);//SNESBankAndData._writeRegister(IODIRA,0x00) # Set MCP bank A to outputs (SNES Bank 0-7)
-	writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
+	changeDataDir(1);//writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs  (SNES Data 0-7)
 
 	writeByte (0, _SNESBankAndData, GPPUB, 0xFF);//SNESBankAndData._writeRegister(GPPUB,0xFF) # Enables Pull-Up Resistors on MCP SNES Data 0-7		
 	
@@ -592,7 +633,7 @@ void shutdownInterface_SPI(void){
 	writeByte (0, _SNESAddressPins, IODIRB, 0xFF);//SNESAddressPins._writeRegister(IODIRB,0xFF) # Set MCP bank B to outputs (SNES Addr 8-15)
 
 	writeByte (0, _SNESBankAndData, IODIRA, 0xFF);//SNESBankAndData._writeRegister(IODIRA,0xFF) # Set MCP bank A to outputs (SNES Bank 0-7)
-	writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs (SNES Data 0-7)
+	changeDataDir(1);//writeByte (0, _SNESBankAndData, IODIRB, 0xFF);//SNESBankAndData._writeRegister(IODIRB,0xFF) # Set MCP bank B to inputs (SNES Data 0-7)
 
 	writeByte (0, _IOControls, IODIRA, 0xEF);//IOControls._writeRegister(IODIRA,0xEF) # Set MCP bank A to inputs; WITH EXCEPTION TO MOSFET
 
@@ -629,7 +670,6 @@ digitalWrite(clkTrigger, 0);
 	
 	
 }
-
 
 
 
@@ -841,7 +881,8 @@ if (isValid == 1){
    dump = calloc(sizeOfCartInBytes, sizeof(uint8_t) );
    printf("Reading %d Low ROM pages.\n", numberOfPages);
 
-   /*dump =*/ ripROM(0x00, isLowROM, firstNumberOfPages, dump);
+   //ROM Ripper
+   ripROM(0x00, isLowROM, firstNumberOfPages, dump);
   }
   
   else{
@@ -854,7 +895,6 @@ if (isValid == 1){
    }
    else
     printf("Reading %d Hi ROM pages.\n", numberOfPages);
-
    /*dump =*/ ripROM(0xC0, isLowROM, firstNumberOfPages, dump); 
 
    if (numberOfRemainPages > 0){
