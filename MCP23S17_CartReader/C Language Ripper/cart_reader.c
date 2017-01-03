@@ -737,8 +737,8 @@ int main(void){
 
 
 
-	//initInterface_SPI();
-	initInterface_GPIO();
+	initInterface_SPI();
+	//initInterface_GPIO();
 
 //----------------------------------------------------------------------------------------------------
 /*
@@ -1010,7 +1010,7 @@ else{
 
 //#--- Clean Up & End Script ------------------------------------------------------
 
-//shutdownInterface_SPI();
-shutdownInterface_GPIO();
+shutdownInterface_SPI();
+//shutdownInterface_GPIO();
 
 }
