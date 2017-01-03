@@ -45,7 +45,7 @@
 #define GPIO_TRIG_HIGH_ADDR 21
 #define GPIO_TRIG_LOW_ADDR 22
 #define GPIO_TRIG_BANK 23
-#define GPIO_TRIG_CTRL 19
+#define GPIO_TRIG_CTRL 24
 
 #define GPIO_OE_CTRL 10
 
@@ -93,7 +93,7 @@ int currentDataDir = 1;
 
 uint8_t readData(void);
 void gotoAddr(int32_t, int);
-void gotoBank(int16_t);
+void gotoBank(uint8_t);
 uint8_t readAddr(int32_t, int);
 uint8_t readAddrBank(int32_t, uint8_t);
 void gotoOffset(uint32_t,int);
@@ -159,23 +159,32 @@ uint8_t readData(void){
 	}
 	//use GPIO
 	else{
+		//delayMicroseconds(10);
 		
 		if (digitalRead (GPIO_DATA_7) )
 			data = data| 0x80;
+		delayMicroseconds(4);
 		if (digitalRead (GPIO_DATA_6) )
 			data = data| 0x40;
+		delayMicroseconds(4);
 		if (digitalRead (GPIO_DATA_5) )
 			data = data| 0x20;
+		delayMicroseconds(4);		
 		if (digitalRead (GPIO_DATA_4) )
 			data = data| 0x10;
+		delayMicroseconds(4);		
 		if (digitalRead (GPIO_DATA_3) )
 			data = data| 0x08;
+		delayMicroseconds(4);		
 		if (digitalRead (GPIO_DATA_2) )
 			data = data| 0x04;
+		delayMicroseconds(4);		
 		if (digitalRead (GPIO_DATA_1) )
 			data = data| 0x02;
+		delayMicroseconds(4);		
 		if (digitalRead (GPIO_DATA_0) )
 			data = data| 0x01;
+		delayMicroseconds(4);		
 
 		return data;		
 	}
@@ -250,7 +259,7 @@ void gotoAddr(int32_t addr, int isLowROM){
 	
 }
 
-void gotoBank(int16_t bank){
+void gotoBank(uint8_t bank){
 	//static int16_t currentBank = -1;
 	
 	if (bank != currentBank){
@@ -487,12 +496,15 @@ void changeDataDir(int direction){
 		//TO DO -------------------------------------------------------------------------------------------------------
 		if (direction == 1){
 			currentDataDir = 1;
+		    digitalWrite(GPIO_OE_DATA_OUT, 1);//disable
+			
 			
 		}
 		
 		else{		
 			
 			currentDataDir = 0;
+			digitalWrite(GPIO_OE_DATA_OUT, 0);//enable
 		}
 		
 	}
@@ -553,7 +565,7 @@ void setIOControl(uint8_t IOControls){
 */	
 
 //Inverses Control Bits. Bits are pulled low to enable
-IOControls ^ 0x0F; 
+IOControls = IOControls ^ 0x0F; 
 
 if (useSPI == 1){
 	
@@ -574,6 +586,11 @@ void initInterface_SPI(void){
 	
 	useSPI = 1;
 	
+	wiringPiSetup () ;
+	mcp23s17Setup (BASE, 0, _IOControls) ;
+	mcp23s17Setup (BASE+100, 0,_SNESAddressPins) ;
+	mcp23s17Setup (BASE+200, 0, _SNESBankAndData) ;
+	
 	writeByte (0, _IOControls, IOCON_B, 0x08);//IOControls._writeRegister(IOCON_B,0x08)
 
 	writeByte (0, _SNESAddressPins, IODIRA, 0x00);//SNESAddressPins._writeRegister(IODIRA,0x00) # Set MCP bank A to outputs (SNES Addr 0-7)
@@ -592,6 +609,7 @@ void initInterface_SPI(void){
 void initInterface_GPIO(void){
 	useSPI = 0;
 	
+	wiringPiSetup();
 	pinMode(GPIO_DATA_DIR, OUTPUT);
 	digitalWrite(GPIO_DATA_DIR, 0);//set up DATA pins as inputs
 	
@@ -630,6 +648,9 @@ void initInterface_GPIO(void){
 	
 	pinMode(GPIO_OE_DATA_OUT, OUTPUT);
 	digitalWrite(GPIO_OE_DATA_OUT, 1);
+	//changeDataDir(1);
+	
+	delayMicroseconds(100);
 	
 }
 
@@ -655,8 +676,12 @@ void shutdownInterface_SPI(void){
 }
 
 void shutdownInterface_GPIO(void){
+	setIOControl(0);
+	gotoAddr(0,0);
+	gotoBank(0);
 	digitalWrite(GPIO_OE_CTRL, 1);//Turn Off Flip flops
 	digitalWrite(GPIO_OE_DATA_OUT, 1);
+
 }
 
 void writeFlipflops(uint8_t dataOut,int clkTrigger){
@@ -676,11 +701,12 @@ digitalWrite(GPIO_OUT_4, bits[4]);
 digitalWrite(GPIO_OUT_5, bits[5]);
 digitalWrite(GPIO_OUT_6, bits[6]);
 digitalWrite(GPIO_OUT_7, bits[7]);
-	
+
+//delayMicroseconds(4000);	
 digitalWrite(clkTrigger, 1);
-for (i=0;i<8;i++);
+delayMicroseconds(100);//for (i=0;i<85000;i++);
 digitalWrite(clkTrigger, 0);
-	
+//delayMicroseconds(5);
 	
 }
 
@@ -709,13 +735,10 @@ int main(void){
 	// ------------- Set Registers -----------------------------------------------------
 
 
-	wiringPiSetup () ;
-	mcp23s17Setup (BASE, 0, _IOControls) ;
-	mcp23s17Setup (BASE+100, 0,_SNESAddressPins) ;
-	mcp23s17Setup (BASE+200, 0, _SNESBankAndData) ;
 
-	initInterface_SPI();
 
+	//initInterface_SPI();
+	initInterface_GPIO();
 
 //----------------------------------------------------------------------------------------------------
 /*
@@ -731,6 +754,31 @@ setIOControl(_RD + _CS + _POWER);
 //time.sleep(.25)
 
 //-----------------------------------------------------
+
+int testint = 0;
+
+
+/*
+changeDataDir(0);
+digitalWrite(GPIO_OE_DATA_OUT, 1);
+for (testint=0;testint <= 255;testint++){
+writeFlipflops(testint,GPIO_TRIG_DATA_OUT);
+printf("Wrote %d : Read %d\n", testint, readData() );
+}
+
+changeDataDir(1);
+
+digitalWrite(GPIO_TRIG_BANK,1);
+digitalWrite(GPIO_TRIG_LOW_ADDR,1);
+digitalWrite(GPIO_TRIG_HIGH_ADDR,1);
+digitalWrite(GPIO_TRIG_CTRL,1); 
+digitalWrite(GPIO_TRIG_DATA_OUT,1);
+
+gotoAddr(0xAAAA,0);
+gotoBank(0xAA);
+while(1)
+printf("FUCK YOU!");
+*/
 
 char cartname[21] = "";
 
@@ -962,7 +1010,7 @@ else{
 
 //#--- Clean Up & End Script ------------------------------------------------------
 
-shutdownInterface_SPI();
-
+//shutdownInterface_SPI();
+shutdownInterface_GPIO();
 
 }
