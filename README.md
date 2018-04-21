@@ -5,7 +5,7 @@ Super Nintendo Emulated System
 http://familab.org/blog/2012/12/snes-super-nintendo-emulated-system/
 
 cart_reader.py -
- Acts as python based cartridge reader, using MCP23017 chips connected to Raspberry Pi's I2C bus. The filname 
+ Acts as python-based cartridge reader, using MCP23017 chips connected to Raspberry Pi's I2C bus. The filename 
  of the ROM and SRAM save data will be determined by Game Title located in game's header. If ROM filename already
  exists, the cart reader will not attempt to rip again.
  
